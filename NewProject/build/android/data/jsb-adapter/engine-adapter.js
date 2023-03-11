@@ -313,11 +313,11 @@ const cacheManager = require('./jsb-cache-manager'); // @ts-expect-error jsb pol
 
 
 (function () {
-  if (window.dragonBones === undefined || window.middleware === undefined) return;
+  if (globalThis.dragonBones === undefined || globalThis.middleware === undefined) return;
   const ArmatureDisplayComponent = cc.internal.ArmatureDisplay;
   if (ArmatureDisplayComponent === undefined) return;
-  const dragonBones = window.dragonBones;
-  const middleware = window.middleware; // dragonbones global time scale.
+  const dragonBones = globalThis.dragonBones;
+  const middleware = globalThis.middleware; // dragonbones global time scale.
 
   Object.defineProperty(dragonBones, 'timeScale', {
     get() {
@@ -568,6 +568,7 @@ const cacheManager = require('./jsb-cache-manager'); // @ts-expect-error jsb pol
     this.jsbTexture.setRealTextureIndex(index);
     this.jsbTexture.setPixelsWide(this._texture.width);
     this.jsbTexture.setPixelsHigh(this._texture.height);
+    this.jsbTexture.setRealTexture(this._texture);
     this._textureAtlasData = factory.parseTextureAtlasData(this.atlasJson, this.jsbTexture, this._uuid);
     _textureIdx2Name[url] = {
       name: this._textureAtlasData.name,
@@ -618,7 +619,7 @@ const cacheManager = require('./jsb-cache-manager'); // @ts-expect-error jsb pol
   const dbAsset = cc.internal.DragonBonesAsset.prototype;
 
   dbAsset.init = function (factory, atlasUUID) {
-    this._factory = factory; // If create by manual, uuid is empty.
+    this._factory = factory || dragonBones.CCFactory.getInstance(); // If create by manual, uuid is empty.
     // Only support json format, if remote load dbbin, must set uuid by manual.
 
     if (!this._uuid && this.dragonBonesJson) {
@@ -698,7 +699,7 @@ const cacheManager = require('./jsb-cache-manager'); // @ts-expect-error jsb pol
         oldArmature.dispose();
       }
 
-      if (this._armature && !this.isAnimationCached()) {
+      if (this._armature && !this.isAnimationCached() && this.shouldSchedule) {
         this._factory.add(this._armature);
       }
     },
@@ -751,6 +752,7 @@ const cacheManager = require('./jsb-cache-manager'); // @ts-expect-error jsb pol
     if (this.isAnimationCached()) {
       const isShare = this._cacheMode === AnimationCacheMode.SHARED_CACHE;
       this._nativeDisplay = new dragonBones.CCArmatureCacheDisplay(this.armatureName, this._armatureKey, atlasUUID, isShare);
+      if (this.shouldSchedule) this._nativeDisplay.beginSchedule();
       this._armature = this._nativeDisplay.armature();
     } else {
       this._nativeDisplay = this._factory.buildArmatureDisplay(this.armatureName, this._armatureKey, '', atlasUUID);
@@ -763,8 +765,7 @@ const cacheManager = require('./jsb-cache-manager'); // @ts-expect-error jsb pol
 
       this._armature = this._nativeDisplay.armature();
       this._armature.animation.timeScale = this.timeScale;
-
-      this._factory.add(this._armature);
+      if (this.shouldSchedule) this._factory.add(this._armature);
     } // add all event into native display
 
 
@@ -790,10 +791,6 @@ const cacheManager = require('./jsb-cache-manager'); // @ts-expect-error jsb pol
     this._sharedBufferOffset = this._nativeDisplay.getSharedBufferOffset();
     this._sharedBufferOffset[0] = 0;
     this._useAttach = false;
-    this._renderOrder = -1; // store render order and world matrix
-
-    this._paramsBuffer = this._nativeDisplay.getParamsBuffer();
-    this._paramsBuffer[0] = -1.0;
 
     this._nativeDisplay.setOpacityModifyRGB(this.premultipliedAlpha);
 
@@ -805,13 +802,25 @@ const cacheManager = require('./jsb-cache-manager'); // @ts-expect-error jsb pol
       this._eventTarget.emit(eventObject.type, eventObject);
     });
 
+    const materialTemplate = this.getMaterialTemplate();
+
+    this._nativeDisplay.setMaterial(materialTemplate);
+
+    this._nativeDisplay.setRenderEntity(this._renderEntity.nativeObj);
+
     this.attachUtil.init(this);
+
+    if (this._armature) {
+      const armatureData = this._armature.armatureData;
+      const aabb = armatureData.aABB;
+
+      this.node._uiProps.uiTransformComp.setContentSize(aabb.width, aabb.height);
+    }
 
     if (this.animationName) {
       this.playAnimation(this.animationName, this.playTimes);
     }
 
-    this.syncTransform(true);
     this.markForUpdateRenderData();
   };
 
@@ -865,11 +874,15 @@ const cacheManager = require('./jsb-cache-manager'); // @ts-expect-error jsb pol
       _onEnable.call(this);
     }
 
-    if (this._armature && !this.isAnimationCached()) {
-      this._factory.add(this._armature);
-    }
+    this.shouldSchedule = true;
 
-    this.syncTransform(true);
+    if (this._armature) {
+      if (this.isAnimationCached()) {
+        this._nativeDisplay.onEnable();
+      } else {
+        this._factory.add(this._armature);
+      }
+    }
 
     this._flushAssembler();
 
@@ -890,6 +903,18 @@ const cacheManager = require('./jsb-cache-manager'); // @ts-expect-error jsb pol
 
     armatureSystem.getInstance().remove(this);
     middleware.release();
+  };
+
+  const _updateMaterial = armatureDisplayProto.updateMaterial;
+
+  armatureDisplayProto.updateMaterial = function () {
+    _updateMaterial.call(this);
+
+    if (this._nativeDisplay) {
+      const mat = this.getMaterialTemplate();
+
+      this._nativeDisplay.setMaterial(mat);
+    }
   };
 
   armatureDisplayProto.once = function (eventType, listener, target) {
@@ -941,41 +966,13 @@ const cacheManager = require('./jsb-cache-manager'); // @ts-expect-error jsb pol
     }
   };
 
-  armatureDisplayProto.syncTransform = function (force) {
-    const node = this.node;
-    if (!node) return;
-    const paramsBuffer = this._paramsBuffer;
-    if (!paramsBuffer) return;
-
-    if (force || node.hasChangedFlags || node._dirtyFlags) {
-      // sync node world matrix to native
-      const worldMat = node.getWorldMatrix();
-      paramsBuffer[1] = worldMat.m00;
-      paramsBuffer[2] = worldMat.m01;
-      paramsBuffer[3] = worldMat.m02;
-      paramsBuffer[4] = worldMat.m03;
-      paramsBuffer[5] = worldMat.m04;
-      paramsBuffer[6] = worldMat.m05;
-      paramsBuffer[7] = worldMat.m06;
-      paramsBuffer[8] = worldMat.m07;
-      paramsBuffer[9] = worldMat.m08;
-      paramsBuffer[10] = worldMat.m09;
-      paramsBuffer[11] = worldMat.m10;
-      paramsBuffer[12] = worldMat.m11;
-      paramsBuffer[13] = worldMat.m12;
-      paramsBuffer[14] = worldMat.m13;
-      paramsBuffer[15] = worldMat.m14;
-      paramsBuffer[16] = worldMat.m15;
-    }
-  };
-
   armatureDisplayProto.setAnimationCacheMode = function (cacheMode) {
     if (this._preCacheMode !== cacheMode) {
       this._cacheMode = cacheMode;
 
       this._buildArmature();
 
-      if (this._armature && !this.isAnimationCached()) {
+      if (this._armature && !this.isAnimationCached() && this.shouldSchedule) {
         this._factory.add(this._armature);
       }
 
@@ -990,15 +987,6 @@ const cacheManager = require('./jsb-cache-manager'); // @ts-expect-error jsb pol
     if (!nativeDisplay) return;
     const node = this.node;
     if (!node) return;
-    const paramsBuffer = this._paramsBuffer;
-
-    if (this._renderOrder !== middleware.renderOrder) {
-      paramsBuffer[0] = middleware.renderOrder;
-      this._renderOrder = middleware.renderOrder;
-      middleware.renderOrder++;
-    }
-
-    this.syncTransform();
 
     if (this.__preColor__ === undefined || !this.color.equals(this.__preColor__)) {
       const compColor = this.color;
@@ -1051,32 +1039,19 @@ const cacheManager = require('./jsb-cache-manager'); // @ts-expect-error jsb pol
 
   const _tempAttachMat4 = cc.mat4();
 
-  let _tempBufferIndex;
-
-  let _tempIndicesOffset;
-
-  let _tempIndicesCount;
-
-  armatureDisplayProto._render = function (ui) {
+  armatureDisplayProto._render = function () {
     const nativeDisplay = this._nativeDisplay;
     if (!nativeDisplay) return;
-    const node = this.node;
-    if (!node) return;
-    const entity = this.renderEntity;
-    entity.clearDynamicRenderDrawInfos();
     const sharedBufferOffset = this._sharedBufferOffset;
     if (!sharedBufferOffset) return;
-    const renderInfoOffset = sharedBufferOffset[0]; // reset render info offset
-
-    sharedBufferOffset[0] = 0;
     const sockets = this.sockets;
 
     if (sockets.length > 0) {
       const attachInfoMgr = middleware.attachInfoMgr;
       const attachInfo = attachInfoMgr.attachInfo;
-      const attachInfoOffset = sharedBufferOffset[1]; // reset attach info offset
+      const attachInfoOffset = sharedBufferOffset[0]; // reset attach info offset
 
-      sharedBufferOffset[1] = 0;
+      sharedBufferOffset[0] = 0;
       const socketNodes = this.socketNodes;
 
       for (let l = sockets.length - 1; l >= 0; l--) {
@@ -1102,40 +1077,12 @@ const cacheManager = require('./jsb-cache-manager'); // @ts-expect-error jsb pol
         boneNode.matrix = tm;
       }
     }
+  };
 
-    const renderInfoMgr = middleware.renderInfoMgr;
-    const renderInfo = renderInfoMgr.renderInfo;
-    let materialIdx = 0;
-    let realTextureIndex;
-    let realTexture; // verify render border
-
-    const border = renderInfo[renderInfoOffset + materialIdx++];
-    if (border !== 0xffffffff) return;
-    const matLen = renderInfo[renderInfoOffset + materialIdx++];
-    if (matLen === 0) return;
-
-    for (let index = 0; index < matLen; index++) {
-      realTextureIndex = renderInfo[renderInfoOffset + materialIdx++];
-      realTexture = this.dragonAtlasAsset.getTextureByIndex(realTextureIndex);
-      if (!realTexture) return; //HACK
-
-      const mat = this.material; // cache material
-
-      this.material = this.getMaterialForBlend(renderInfo[renderInfoOffset + materialIdx++], renderInfo[renderInfoOffset + materialIdx++]);
-      _tempBufferIndex = renderInfo[renderInfoOffset + materialIdx++];
-      _tempIndicesOffset = renderInfo[renderInfoOffset + materialIdx++];
-      _tempIndicesCount = renderInfo[renderInfoOffset + materialIdx++];
-      const renderData = middleware.RenderInfoLookup[middleware.vfmtPosUvColor][_tempBufferIndex];
-      const drawInfo = this.requestDrawInfo(index);
-      drawInfo.setDrawInfoType(renderData.drawInfoType);
-      drawInfo.setAccAndBuffer(renderData.accessor.id, renderData.chunk.bufferId);
-      drawInfo.setTexture(realTexture.getGFXTexture());
-      drawInfo.setSampler(realTexture.getGFXSampler());
-      drawInfo.setMaterial(this.material);
-      drawInfo.setIndexOffset(_tempIndicesOffset);
-      drawInfo.setIBCount(_tempIndicesCount);
-      entity.setDynamicRenderDrawInfo(drawInfo, index);
-      this.material = mat;
+  armatureDisplayProto._updateBatch = function () {
+    if (this.nativeDisplay) {
+      this.nativeDisplay.setBatchEnabled(this.enableBatch);
+      this.markForUpdateRenderData();
     }
   }; //////////////////////////////////////////
   // assembler
@@ -1421,27 +1368,16 @@ const cacheManager = require('./jsb-cache-manager'); // @ts-expect-error jsb pol
  ****************************************************************************/
 // @ts-expect-error jsb polyfills
 (function () {
-  if (!window.middleware) return;
-  const RenderDrawInfoType_IA = 2;
-  const middleware = window.middleware;
+  if (!globalThis.middleware) return;
+  const middleware = globalThis.middleware;
   const middlewareMgr = middleware.MiddlewareManager.getInstance();
   let reference = 0;
   const director = cc.director;
   const game = cc.game;
-  const _accessors = [];
-  const nativeXYZUVC = middleware.vfmtPosUvColor = 9;
-  const nativeXYZUVCC = middleware.vfmtPosUvTwoColor = 13;
-  const vfmtPosUvColor = cc.internal.vfmtPosUvColor;
-  const vfmtPosUvTwoColor = cc.internal.vfmtPosUvTwoColor;
-  const renderInfoLookup = middleware.RenderInfoLookup = {};
-  renderInfoLookup[nativeXYZUVC] = [];
-  renderInfoLookup[nativeXYZUVCC] = [];
 
   middleware.reset = function () {
     middleware.preRenderComponent = null;
     middleware.preRenderBufferIndex = 0;
-    middleware.preRenderBufferType = nativeXYZUVC;
-    middleware.renderOrder = 0;
     middleware.indicesStart = 0;
     middleware.resetIndicesStart = false;
   };
@@ -1459,52 +1395,7 @@ const cacheManager = require('./jsb-cache-manager'); // @ts-expect-error jsb pol
     }
 
     reference--;
-
-    if (reference === 0) {
-      const uvcBuffers = renderInfoLookup[nativeXYZUVC];
-
-      for (let i = 0; i < uvcBuffers.length; i++) {
-        cc.UI.RenderData.remove(uvcBuffers[i]);
-      }
-
-      uvcBuffers.length = 0;
-      const uvccBuffers = renderInfoLookup[nativeXYZUVCC];
-
-      for (let i = 0; i < uvccBuffers.length; i++) {
-        cc.UI.RenderData.remove(uvccBuffers[i]);
-      }
-
-      uvccBuffers.length = 0;
-
-      _accessors.forEach(accessor => {
-        accessor.destroy();
-      });
-    }
   };
-
-  function CopyNativeBufferToJS(renderer, nativeFormat, jsFormat) {
-    if (!renderer) return;
-    const bufferCount = middlewareMgr.getBufferCount(nativeFormat);
-
-    for (let i = 0; i < bufferCount; i++) {
-      let buffer = renderInfoLookup[nativeFormat][i];
-
-      if (!buffer) {
-        if (!_accessors[jsFormat]) {
-          _accessors[jsFormat] = cc.UI.RenderData.createStaticVBAccessor(jsFormat, 65535, 524280);
-        }
-
-        buffer = cc.UI.RenderData.add(jsFormat, _accessors[jsFormat]);
-        buffer.multiOwner = true;
-        buffer.drawInfoType = RenderDrawInfoType_IA; // vertex count 65535, indices count 8 * 65535
-
-        buffer.resize(65535, 524280);
-        const meshBuffer = buffer.getMeshBuffer();
-        meshBuffer.useLinkedData = true;
-        renderInfoLookup[nativeFormat][i] = buffer;
-      }
-    }
-  }
 
   director.on(cc.Director.EVENT_BEFORE_UPDATE, () => {
     if (reference === 0) return;
@@ -1514,27 +1405,23 @@ const cacheManager = require('./jsb-cache-manager'); // @ts-expect-error jsb pol
     if (reference === 0) return;
     middlewareMgr.render(game.deltaTime); // reset render order
 
-    middleware.reset();
-    const batcher2D = director.root.batcher2D;
-    CopyNativeBufferToJS(batcher2D, nativeXYZUVC, vfmtPosUvColor);
-    CopyNativeBufferToJS(batcher2D, nativeXYZUVCC, vfmtPosUvTwoColor);
-    const skeletonSystem = cc.internal.SpineSkeletonSystem.getInstance();
-    skeletonSystem.prepareRenderData();
-    const armaSystem = cc.internal.ArmatureSystem.getInstance();
-    armaSystem.prepareRenderData();
+    middleware.reset(); //const batcher2D = director.root.batcher2D;
+
+    if (globalThis.dragonBones) {
+      const armaSystem = cc.internal.ArmatureSystem.getInstance();
+      armaSystem.prepareRenderData();
+    }
+
+    if (globalThis.spine) {
+      const skeletonSystem = cc.internal.SpineSkeletonSystem.getInstance();
+      skeletonSystem.prepareRenderData();
+    }
   });
-  const renderInfoMgr = middlewareMgr.getRenderInfoMgr();
-  renderInfoMgr.renderInfo = renderInfoMgr.getSharedBuffer();
-  renderInfoMgr.setResizeCallback(function () {
-    this.attachInfo = this.getSharedBuffer();
-  });
-  renderInfoMgr.__middleware__ = middleware;
   const attachInfoMgr = middlewareMgr.getAttachInfoMgr();
   attachInfoMgr.attachInfo = attachInfoMgr.getSharedBuffer();
   attachInfoMgr.setResizeCallback(function () {
     this.attachInfo = this.getSharedBuffer();
   });
-  middleware.renderInfoMgr = renderInfoMgr;
   middleware.attachInfoMgr = attachInfoMgr; // generate get set function
 
   middleware.generateGetSet = function (moduleObj) {
@@ -1841,7 +1728,7 @@ var fsUtils = {
   }
 
 };
-window.fsUtils = module.exports = fsUtils;
+globalThis.fsUtils = module.exports = fsUtils;
 
 },{}],8:[function(require,module,exports){
 "use strict";
@@ -1920,7 +1807,10 @@ const deviceProto = gfx.Device.prototype;
 const swapchainProto = gfx.Swapchain.prototype;
 const bufferProto = gfx.Buffer.prototype;
 const textureProto = gfx.Texture.prototype;
-const descriptorSetProto = gfx.DescriptorSet.prototype; ///////////////////////////// handle different paradigms /////////////////////////////
+const descriptorSetProto = gfx.DescriptorSet.prototype;
+
+const jsbWindow = require('../jsbWindow'); ///////////////////////////// handle different paradigms /////////////////////////////
+
 
 const oldCopyTexImagesToTextureFunc = deviceProto.copyTexImagesToTexture;
 
@@ -1931,10 +1821,10 @@ deviceProto.copyTexImagesToTexture = function (texImages, texture, regions) {
     for (let i = 0; i < texImages.length; ++i) {
       const texImage = texImages[i];
 
-      if (texImage instanceof HTMLCanvasElement) {
+      if (texImage instanceof jsbWindow.HTMLCanvasElement) {
         // Refer to HTMLCanvasElement and ImageData implementation
         images.push(texImage._data.data);
-      } else if (texImage instanceof HTMLImageElement) {
+      } else if (texImage instanceof jsbWindow.HTMLImageElement) {
         // Refer to HTMLImageElement implementation
         images.push(texImage._data);
       } else {
@@ -1950,14 +1840,14 @@ deviceProto.copyTexImagesToTexture = function (texImages, texture, regions) {
 const oldDeviceCreateSwapchainFunc = deviceProto.createSwapchain;
 
 deviceProto.createSwapchain = function (info) {
-  info.windowHandle = window.windowHandler;
+  info.windowHandle = jsbWindow.windowHandler;
   return oldDeviceCreateSwapchainFunc.call(this, info);
 };
 
 const oldSwapchainInitializeFunc = swapchainProto.initialize;
 
 swapchainProto.initialize = function (info) {
-  info.windowHandle = window.windowHandler;
+  info.windowHandle = jsbWindow.windowHandler;
   oldSwapchainInitializeFunc.call(this, info);
 };
 
@@ -2077,7 +1967,9 @@ Object.defineProperty(deviceProto, 'uboOffsetAlignment', {
 
 });
 
-},{}],10:[function(require,module,exports){
+},{"../jsbWindow":15}],10:[function(require,module,exports){
+"use strict";
+
 /****************************************************************************
  Copyright (c) 2013-2016 Chukong Technologies Inc.
  Copyright (c) 2017-2020 Xiamen Yaji Software Co., Ltd.
@@ -2103,7 +1995,7 @@ Object.defineProperty(deviceProto, 'uboOffsetAlignment', {
  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  THE SOFTWARE.
  ****************************************************************************/
-'use strict';
+const jsbWindow = require('../jsbWindow');
 
 const cacheManager = require('./jsb-cache-manager');
 
@@ -2122,12 +2014,12 @@ const parser = cc.assetManager.parser;
 const presets = cc.assetManager.presets;
 downloader.maxConcurrency = 30;
 downloader.maxRequestsPerFrame = 60;
-presets['preload'].maxConcurrency = 15;
-presets['preload'].maxRequestsPerFrame = 30;
-presets['scene'].maxConcurrency = 32;
-presets['scene'].maxRequestsPerFrame = 64;
-presets['bundle'].maxConcurrency = 32;
-presets['bundle'].maxRequestsPerFrame = 64;
+presets.preload.maxConcurrency = 15;
+presets.preload.maxRequestsPerFrame = 30;
+presets.scene.maxConcurrency = 32;
+presets.scene.maxRequestsPerFrame = 64;
+presets.bundle.maxConcurrency = 32;
+presets.bundle.maxRequestsPerFrame = 64;
 let suffix = 0;
 const failureMap = {};
 const maxRetryCountFromBreakpoint = 5;
@@ -2140,8 +2032,13 @@ function downloadScript(url, options, onComplete) {
   }
 
   if (loadedScripts[url]) return onComplete && onComplete();
-  download(url, function (src, options, onComplete) {
-    window.require(src);
+  download(url, (src, options, onComplete) => {
+    if (__EDITOR__) {
+      // in editor mode,require is from electron,__require is from engine
+      globalThis.__require(src);
+    } else {
+      globalThis.require(src);
+    }
 
     loadedScripts[url] = true;
     onComplete && onComplete(null);
@@ -2149,13 +2046,13 @@ function downloadScript(url, options, onComplete) {
 }
 
 function download(url, func, options, onFileProgress, onComplete) {
-  var result = transformUrl(url, options);
+  const result = transformUrl(url, options);
 
   if (result.inLocal) {
     func(result.url, options, onComplete);
   } else if (result.inCache) {
     cacheManager.updateLastTime(url);
-    func(result.url, options, function (err, data) {
+    func(result.url, options, (err, data) => {
       if (err) {
         cacheManager.removeCache(url);
       }
@@ -2163,9 +2060,9 @@ function download(url, func, options, onFileProgress, onComplete) {
       onComplete(err, data);
     });
   } else {
-    var time = Date.now();
-    var storagePath = '';
-    var failureRecord = failureMap[url];
+    const time = Date.now();
+    let storagePath = '';
+    const failureRecord = failureMap[url];
 
     if (failureRecord) {
       storagePath = failureRecord.storagePath;
@@ -2175,7 +2072,7 @@ function download(url, func, options, onFileProgress, onComplete) {
       storagePath = `${time}${suffix++}${cc.path.extname(url)}`;
     }
 
-    downloadFile(url, `${cacheManager.cacheDir}/${storagePath}`, options.header, onFileProgress, function (err, path) {
+    downloadFile(url, `${cacheManager.cacheDir}/${storagePath}`, options.header, onFileProgress, (err, path) => {
       if (err) {
         if (failureRecord) {
           failureRecord.retryCount++;
@@ -2195,7 +2092,7 @@ function download(url, func, options, onFileProgress, onComplete) {
       }
 
       delete failureMap[url];
-      func(path, options, function (err, data) {
+      func(path, options, (err, data) => {
         if (!err) {
           cacheManager.cacheFile(url, storagePath, options.__cacheBundleRoot__);
         }
@@ -2207,8 +2104,8 @@ function download(url, func, options, onFileProgress, onComplete) {
 }
 
 function transformUrl(url, options) {
-  var inLocal = false;
-  var inCache = false;
+  let inLocal = false;
+  let inCache = false;
 
   if (REGEX.test(url)) {
     if (options.reload) {
@@ -2216,7 +2113,7 @@ function transformUrl(url, options) {
         url
       };
     } else {
-      var cache = cacheManager.getCache(url);
+      const cache = cacheManager.getCache(url);
 
       if (cache) {
         inCache = true;
@@ -2243,19 +2140,19 @@ function downloadAsset(url, options, onComplete) {
 }
 
 function _getFontFamily(fontHandle) {
-  var ttfIndex = fontHandle.lastIndexOf(".ttf");
+  const ttfIndex = fontHandle.lastIndexOf('.ttf');
   if (ttfIndex === -1) return fontHandle;
-  var slashPos = fontHandle.lastIndexOf("/");
-  var fontFamilyName;
+  const slashPos = fontHandle.lastIndexOf('/');
+  let fontFamilyName;
 
   if (slashPos === -1) {
-    fontFamilyName = fontHandle.substring(0, ttfIndex) + "_LABEL";
+    fontFamilyName = `${fontHandle.substring(0, ttfIndex)}_LABEL`;
   } else {
-    fontFamilyName = fontHandle.substring(slashPos + 1, ttfIndex) + "_LABEL";
+    fontFamilyName = `${fontHandle.substring(slashPos + 1, ttfIndex)}_LABEL`;
   }
 
   if (fontFamilyName.indexOf(' ') !== -1) {
-    fontFamilyName = '"' + fontFamilyName + '"';
+    fontFamilyName = `"${fontFamilyName}"`;
   }
 
   return fontFamilyName;
@@ -2282,43 +2179,44 @@ function downloadJson(url, options, onComplete) {
 }
 
 function downloadBundle(nameOrUrl, options, onComplete) {
-  let bundleName = cc.path.basename(nameOrUrl);
-  var version = options.version || downloader.bundleVers[bundleName];
+  const bundleName = cc.path.basename(nameOrUrl);
+  const version = options.version || downloader.bundleVers[bundleName];
   let url;
 
   if (REGEX.test(nameOrUrl) || nameOrUrl.startsWith(getUserDataPath())) {
     url = nameOrUrl;
     cacheManager.makeBundleFolder(bundleName);
+  } else if (downloader.remoteBundles.indexOf(bundleName) !== -1) {
+    url = `${downloader.remoteServerAddress}remote/${bundleName}`;
+    cacheManager.makeBundleFolder(bundleName);
   } else {
-    if (downloader.remoteBundles.indexOf(bundleName) !== -1) {
-      url = `${downloader.remoteServerAddress}remote/${bundleName}`;
-      cacheManager.makeBundleFolder(bundleName);
-    } else {
-      url = `assets/${bundleName}`;
-    }
+    url = `assets/${bundleName}`;
   }
 
-  var config = `${url}/cc.config.${version ? version + '.' : ''}json`;
+  const config = `${url}/cc.config.${version ? `${version}.` : ''}json`;
   options.__cacheBundleRoot__ = bundleName;
-  downloadJson(config, options, function (err, response) {
+  downloadJson(config, options, (err, response) => {
     if (err) {
       return onComplete(err, null);
     }
 
-    let out = response;
-    out && (out.base = url + '/');
-    var js = `${url}/index.${version ? version + '.' : ''}${out.encrypted ? 'jsc' : `js`}`;
-    downloadScript(js, options, function (err) {
-      if (err) {
-        return onComplete(err, null);
-      }
+    const out = response;
+    out && (out.base = `${url}/`);
 
+    if (out.hasPreloadScript) {
+      const js = `${url}/index.${version ? `${version}.` : ''}${out.encrypted ? 'jsc' : `js`}`;
+      downloadScript(js, options, err => {
+        if (err) {
+          return onComplete(err, null);
+        }
+
+        onComplete(null, out);
+      });
+    } else {
       onComplete(null, out);
-    });
+    }
   });
 }
-
-;
 
 const downloadCCON = (url, options, onComplete) => {
   downloadJson(url, options, (err, json) => {
@@ -2367,14 +2265,14 @@ function downloadArrayBuffer(url, options, onComplete) {
 }
 
 function loadFont(url, options, onComplete) {
-  let fontFamilyName = _getFontFamily(url);
+  const fontFamilyName = _getFontFamily(url);
 
-  let fontFace = new FontFace(fontFamilyName, "url('" + url + "')");
-  document.fonts.add(fontFace);
+  const fontFace = new jsbWindow.FontFace(fontFamilyName, `url('${url}')`);
+  jsbWindow.document.fonts.add(fontFace);
   fontFace.load();
-  fontFace.loaded.then(function () {
+  fontFace.loaded.then(() => {
     onComplete(null, fontFamilyName);
-  }, function () {
+  }, () => {
     cc.warnID(4933, fontFamilyName);
     onComplete(null, fontFamilyName);
   });
@@ -2382,8 +2280,8 @@ function loadFont(url, options, onComplete) {
 
 const originParsePlist = parser.parsePlist;
 
-let parsePlist = function (url, options, onComplete) {
-  readText(url, function (err, file) {
+const parsePlist = function (url, options, onComplete) {
+  readText(url, (err, file) => {
     if (err) return onComplete(err);
     originParsePlist(file, options, onComplete);
   });
@@ -2464,8 +2362,8 @@ downloader.register({
   '.woff': downloadAsset,
   '.svg': downloadAsset,
   '.ttc': downloadAsset,
-  'bundle': downloadBundle,
-  'default': downloadText
+  bundle: downloadBundle,
+  default: downloadText
 });
 parser.register({
   // Images
@@ -2510,11 +2408,11 @@ parser.register({
   '.ttc': loadFont,
   '.ExportJson': parseJson
 });
-cc.assetManager.transformPipeline.append(function (task) {
-  var input = task.output = task.input;
+cc.assetManager.transformPipeline.append(task => {
+  const input = task.output = task.input;
 
-  for (var i = 0, l = input.length; i < l; i++) {
-    var item = input[i];
+  for (let i = 0, l = input.length; i < l; i++) {
+    const item = input[i];
 
     if (item.config) {
       item.options.__cacheBundleRoot__ = item.config.name;
@@ -2527,7 +2425,7 @@ cc.assetManager.transformPipeline.append(function (task) {
     }
   }
 });
-var originInit = cc.assetManager.init;
+const originInit = cc.assetManager.init;
 
 cc.assetManager.init = function (options) {
   originInit.call(cc.assetManager, options);
@@ -2537,7 +2435,7 @@ cc.assetManager.init = function (options) {
   cacheManager.init();
 };
 
-},{"./jsb-cache-manager":3,"./jsb-fs-utils":7}],11:[function(require,module,exports){
+},{"../jsbWindow":15,"./jsb-cache-manager":3,"./jsb-fs-utils":7}],11:[function(require,module,exports){
 "use strict";
 
 const jsbPhy = globalThis['jsb.physics'];
@@ -3550,7 +3448,7 @@ class Joint {
 
 }
 
-class DistanceJoint extends Joint {
+class SphericalJoint extends Joint {
   constructor() {
     super();
     this._impl = new jsbPhy.DistanceJoint();
@@ -3599,6 +3497,28 @@ class RevoluteJoint extends Joint {
 
 }
 
+class FixedJoint extends Joint {
+  constructor() {
+    super();
+    this._impl = new jsbPhy.FixedJoint();
+  }
+
+  setBreakForce(v) {
+    this._impl.setBreakForce(v);
+  }
+
+  setBreakTorque(v) {
+    this._impl.setBreakTorque(v);
+  }
+
+  onLoad() {
+    super.onLoad();
+    this.setBreakForce(this._com.breakForce);
+    this.setBreakTorque(this._com.breakTorque);
+  }
+
+}
+
 cc.physics.selector.register('physx', {
   PhysicsWorld,
   RigidBody,
@@ -3610,8 +3530,9 @@ cc.physics.selector.register('physx', {
   CylinderShape,
   TrimeshShape,
   TerrainShape,
-  PointToPointConstraint: DistanceJoint,
-  HingeConstraint: RevoluteJoint
+  PointToPointConstraint: SphericalJoint,
+  HingeConstraint: RevoluteJoint,
+  FixedConstraint: FixedJoint
 });
 
 },{}],12:[function(require,module,exports){
@@ -3645,10 +3566,10 @@ const cacheManager = require('./jsb-cache-manager'); // @ts-expect-error jsb pol
 
 
 (function () {
-  if (window.spine === undefined || window.middleware === undefined) return;
+  if (globalThis.spine === undefined || globalThis.middleware === undefined) return;
   if (cc.internal.SpineSkeletonData === undefined) return;
-  const spine = window.spine;
-  const middleware = window.middleware;
+  const spine = globalThis.spine;
+  const middleware = globalThis.middleware;
   middleware.generateGetSet(spine); // spine global time scale
 
   Object.defineProperty(spine, 'timeScale', {
@@ -3750,6 +3671,7 @@ const cacheManager = require('./jsb-cache-manager'); // @ts-expect-error jsb pol
       spTex.setRealTextureIndex(textureIdx);
       spTex.setPixelsWide(texture.width);
       spTex.setPixelsHigh(texture.height);
+      spTex.setRealTexture(texture);
       jsbTextures[textureNames[i]] = spTex;
     }
 
@@ -3894,6 +3816,18 @@ const cacheManager = require('./jsb-cache-manager'); // @ts-expect-error jsb pol
     }
 
   });
+  const _updateMaterial = skeleton.updateMaterial;
+
+  skeleton.updateMaterial = function () {
+    _updateMaterial.call(this);
+
+    if (this._nativeSkeleton) {
+      const mat = this.getMaterialTemplate();
+
+      this._nativeSkeleton.setMaterial(mat);
+    }
+  };
+
   const _updateDebugDraw = skeleton._updateDebugDraw;
 
   skeleton._updateDebugDraw = function () {
@@ -3915,6 +3849,16 @@ const cacheManager = require('./jsb-cache-manager'); // @ts-expect-error jsb pol
 
     if (this._nativeSkeleton) {
       this._nativeSkeleton.setUseTint(this.useTint);
+    }
+  };
+
+  skeleton._updateBatch = function () {
+    if (this._nativeSkeleton) {
+      this._renderEntity.setUseLocal(!this.enableBatch);
+
+      this._nativeSkeleton.setBatchEnabled(this.enableBatch);
+
+      this.markForUpdateRenderData();
     }
   };
 
@@ -3968,12 +3912,19 @@ const cacheManager = require('./jsb-cache-manager'); // @ts-expect-error jsb pol
 
     this._nativeSkeleton = nativeSkeleton;
     nativeSkeleton._comp = this;
+    if (this.shouldSchedule) nativeSkeleton.beginSchedule();
     nativeSkeleton.setUseTint(this.useTint);
     nativeSkeleton.setOpacityModifyRGB(this.premultipliedAlpha);
     nativeSkeleton.setTimeScale(this.timeScale);
     nativeSkeleton.setBatchEnabled(this.enableBatch);
     const compColor = this.color;
     nativeSkeleton.setColor(compColor.r, compColor.g, compColor.b, compColor.a);
+    const materialTemplate = this.getMaterialTemplate();
+    nativeSkeleton.setMaterial(materialTemplate);
+
+    this._renderEntity.setUseLocal(!this.enableBatch);
+
+    nativeSkeleton.setRenderEntity(this._renderEntity.nativeObj);
     this._skeleton = nativeSkeleton.getSkeleton(); // init skeleton listener
 
     this._startListener && this.setStartListener(this._startListener);
@@ -3983,12 +3934,7 @@ const cacheManager = require('./jsb-cache-manager'); // @ts-expect-error jsb pol
     this._interruptListener && this.setInterruptListener(this._interruptListener);
     this._disposeListener && this.setDisposeListener(this._disposeListener);
     this._sharedBufferOffset = nativeSkeleton.getSharedBufferOffset();
-    this._sharedBufferOffset[0] = 0;
     this._useAttach = false;
-    this._renderOrder = -1; // store render order and world matrix
-
-    this._paramsBuffer = nativeSkeleton.getParamsBuffer();
-    this.syncTransform(true);
     this.markForUpdateRenderData();
   };
 
@@ -4017,11 +3963,12 @@ const cacheManager = require('./jsb-cache-manager'); // @ts-expect-error jsb pol
       _onEnable.call(this);
     }
 
+    this.shouldSchedule = true;
+
     if (this._nativeSkeleton) {
       this._nativeSkeleton.onEnable();
     }
 
-    this.syncTransform(true);
     middleware.retain();
   };
 
@@ -4043,34 +3990,6 @@ const cacheManager = require('./jsb-cache-manager'); // @ts-expect-error jsb pol
     if (this._nativeSkeleton && !this.isAnimationCached()) {
       this._nativeSkeleton.setVertexEffectDelegate(effectDelegate);
     }
-  };
-
-  skeleton.syncTransform = function (force) {
-    const node = this.node;
-    if (!node) return;
-    const paramsBuffer = this._paramsBuffer;
-    if (!paramsBuffer) return;
-
-    if (force || node.hasChangedFlags || node._dirtyFlags) {
-      // sync node world matrix to native
-      const worldMat = node.getWorldMatrix();
-      paramsBuffer[1] = worldMat.m00;
-      paramsBuffer[2] = worldMat.m01;
-      paramsBuffer[3] = worldMat.m02;
-      paramsBuffer[4] = worldMat.m03;
-      paramsBuffer[5] = worldMat.m04;
-      paramsBuffer[6] = worldMat.m05;
-      paramsBuffer[7] = worldMat.m06;
-      paramsBuffer[8] = worldMat.m07;
-      paramsBuffer[9] = worldMat.m08;
-      paramsBuffer[10] = worldMat.m09;
-      paramsBuffer[11] = worldMat.m10;
-      paramsBuffer[12] = worldMat.m11;
-      paramsBuffer[13] = worldMat.m12;
-      paramsBuffer[14] = worldMat.m13;
-      paramsBuffer[15] = worldMat.m14;
-      paramsBuffer[16] = worldMat.m15;
-    }
   }; // eslint-disable-next-line no-unused-vars
 
 
@@ -4079,15 +3998,6 @@ const cacheManager = require('./jsb-cache-manager'); // @ts-expect-error jsb pol
     if (!nativeSkeleton) return;
     const node = this.node;
     if (!node) return;
-    const paramsBuffer = this._paramsBuffer;
-
-    if (this._renderOrder !== middleware.renderOrder) {
-      paramsBuffer[0] = middleware.renderOrder;
-      this._renderOrder = middleware.renderOrder;
-      middleware.renderOrder++;
-    }
-
-    this.syncTransform();
 
     if (this.__preColor__ === undefined || !this.color.equals(this.__preColor__)) {
       const compColor = this.color;
@@ -4487,34 +4397,19 @@ const cacheManager = require('./jsb-cache-manager'); // @ts-expect-error jsb pol
 
   const _tempAttachMat4 = cc.mat4();
 
-  let _tempVfmt;
-
-  let _tempBufferIndex;
-
-  let _tempIndicesOffset;
-
-  let _tempIndicesCount;
-
-  skeleton._render = function (ui) {
+  skeleton._render = function () {
     const nativeSkeleton = this._nativeSkeleton;
     if (!nativeSkeleton) return;
-    const node = this.node;
-    if (!node) return;
-    const entity = this.renderEntity;
-    entity.clearDynamicRenderDrawInfos();
-    const sharedBufferOffset = this._sharedBufferOffset;
-    if (!sharedBufferOffset) return;
-    const renderInfoOffset = sharedBufferOffset[0]; // reset render info offset
-
-    sharedBufferOffset[0] = 0;
     const socketNodes = this.socketNodes;
 
     if (socketNodes.size > 0) {
+      const sharedBufferOffset = this._sharedBufferOffset;
+      if (!sharedBufferOffset) return;
       const attachInfoMgr = middleware.attachInfoMgr;
       const attachInfo = attachInfoMgr.attachInfo;
-      const attachInfoOffset = sharedBufferOffset[1]; // reset attach info offset
+      const attachInfoOffset = sharedBufferOffset[0]; // reset attach info offset
 
-      sharedBufferOffset[1] = 0;
+      sharedBufferOffset[0] = 0;
 
       for (const boneIdx of socketNodes.keys()) {
         const boneNode = socketNodes.get(boneIdx); // Node has been destroy
@@ -4534,46 +4429,6 @@ const cacheManager = require('./jsb-cache-manager'); // @ts-expect-error jsb pol
         tm.m13 = attachInfo[matOffset + 13];
         boneNode.matrix = tm;
       }
-    }
-
-    const renderInfoMgr = middleware.renderInfoMgr;
-    const renderInfo = renderInfoMgr.renderInfo;
-    let materialIdx = 0;
-    let realTextureIndex;
-    let realTexture; // verify render border
-
-    const border = renderInfo[renderInfoOffset + materialIdx++];
-    if (border !== 0xffffffff) return;
-    const matLen = renderInfo[renderInfoOffset + materialIdx++];
-    const useTint = this.useTint || this.isAnimationCached();
-    const vfmt = useTint ? middleware.vfmtPosUvTwoColor : middleware.vfmtPosUvColor;
-    _tempVfmt = vfmt;
-    if (matLen === 0) return;
-
-    for (let index = 0; index < matLen; index++) {
-      realTextureIndex = renderInfo[renderInfoOffset + materialIdx++];
-      realTexture = this.skeletonData.getTextureByIndex(realTextureIndex);
-      if (!realTexture) return; // SpineMaterialType.TWO_COLORED 1
-      // SpineMaterialType.COLORED_TEXTURED 0
-      //HACK
-
-      const mat = this.material; // cache material
-
-      this.material = this.getMaterialForBlendAndTint(renderInfo[renderInfoOffset + materialIdx++], renderInfo[renderInfoOffset + materialIdx++], useTint ? 1 : 0);
-      _tempBufferIndex = renderInfo[renderInfoOffset + materialIdx++];
-      _tempIndicesOffset = renderInfo[renderInfoOffset + materialIdx++];
-      _tempIndicesCount = renderInfo[renderInfoOffset + materialIdx++];
-      const renderData = middleware.RenderInfoLookup[_tempVfmt][_tempBufferIndex];
-      const drawInfo = this.requestDrawInfo(index);
-      drawInfo.setDrawInfoType(renderData.drawInfoType);
-      drawInfo.setAccAndBuffer(renderData.accessor.id, renderData.chunk.bufferId);
-      drawInfo.setTexture(realTexture.getGFXTexture());
-      drawInfo.setSampler(realTexture.getGFXSampler());
-      drawInfo.setMaterial(this.material);
-      drawInfo.setIndexOffset(_tempIndicesOffset);
-      drawInfo.setIBCount(_tempIndicesCount);
-      entity.setDynamicRenderDrawInfo(drawInfo, index);
-      this.material = mat;
     }
   }; //////////////////////////////////////////
   // assembler
@@ -5078,5 +4933,12 @@ if (cc.internal.WebView) {
 
   }
 }
+
+},{}],15:[function(require,module,exports){
+"use strict";
+
+const jsbWindow = globalThis.jsb.window = globalThis.jsb.window || {}; //TODO(PatriceJiang):
+
+module.exports = jsbWindow;
 
 },{}]},{},[1]);

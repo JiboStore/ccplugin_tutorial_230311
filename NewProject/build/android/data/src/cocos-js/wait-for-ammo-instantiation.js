@@ -1,14 +1,1 @@
-System.register(['./instantiated-21cd46c3.js'], function (exports) {
-	'use strict';
-	return {
-		setters: [function (module) {
-			exports('default', module.hd);
-		}],
-		execute: function () {
-
-
-
-		}
-	};
-});
-//# sourceMappingURL=wait-for-ammo-instantiation.js.map
+System.register(["./instantiated-f646339e.js"],(function(t){"use strict";return{setters:[function(e){t("default",e.gZ)}],execute:function(){}}}));

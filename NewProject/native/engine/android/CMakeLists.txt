@@ -8,6 +8,7 @@ set(CC_PROJ_SOURCES)
 set(CC_COMMON_SOURCES)
 set(CC_ALL_SOURCES)
 
+include(C:/dev/github/cocos-engine/templates/cmake/android.cmake)
 include(${CMAKE_CURRENT_LIST_DIR}/../common/CMakeLists.txt)
 
 cc_android_before_target(${CC_LIB_NAME})

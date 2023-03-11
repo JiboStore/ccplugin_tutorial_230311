@@ -285,19 +285,17 @@ exports.clearImmediate = typeof clearImmediate === "function" ? clearImmediate :
 /*! @source http://purl.eligrey.com/github/Blob.js/blob/master/Blob.js */
 (function (global) {
   (function (factory) {
-    if (typeof define === "function" && define.amd) {
+    if (typeof define === 'function' && define.amd) {
       // AMD. Register as an anonymous module.
-      define(["exports"], factory);
-    } else if (typeof exports === "object" && typeof exports.nodeName !== "string") {
+      define(['exports'], factory);
+    } else if (typeof exports === 'object' && typeof exports.nodeName !== 'string') {
       // CommonJS
       factory(exports);
     } else {
       // Browser globals
       factory(global);
     }
-  })(function (exports) {
-    "use strict";
-
+  })(exports => {
     exports.URL = global.URL || global.webkitURL;
 
     if (global.Blob && global.URL) {
@@ -309,37 +307,41 @@ exports.clearImmediate = typeof clearImmediate === "function" ? clearImmediate :
     // in order to support older browsers that only have BlobBuilder
 
 
-    var BlobBuilder = global.BlobBuilder || global.WebKitBlobBuilder || global.MozBlobBuilder || function () {
-      var get_class = function (object) {
+    const BlobBuilder = global.BlobBuilder || global.WebKitBlobBuilder || global.MozBlobBuilder || function () {
+      const get_class = function (object) {
         return Object.prototype.toString.call(object).match(/^\[object\s(.*)\]$/)[1];
-      },
-          FakeBlobBuilder = function BlobBuilder() {
+      };
+
+      const FakeBlobBuilder = function BlobBuilder() {
         this.data = [];
-      },
-          FakeBlob = function Blob(data, type, encoding) {
+      };
+
+      const FakeBlob = function Blob(data, type, encoding) {
         this.data = data;
         this.size = data.length;
         this.type = type;
         this.encoding = encoding;
-      },
-          FBB_proto = FakeBlobBuilder.prototype,
-          FB_proto = FakeBlob.prototype,
-          FileReaderSync = global.FileReaderSync,
-          FileException = function (type) {
-        this.code = this[this.name = type];
-      },
-          file_ex_codes = ("NOT_FOUND_ERR SECURITY_ERR ABORT_ERR NOT_READABLE_ERR ENCODING_ERR " + "NO_MODIFICATION_ALLOWED_ERR INVALID_STATE_ERR SYNTAX_ERR").split(" "),
-          file_ex_code = file_ex_codes.length,
-          real_URL = global.URL || global.webkitURL || exports,
-          real_create_object_URL = real_URL.createObjectURL,
-          real_revoke_object_URL = real_URL.revokeObjectURL,
-          URL = real_URL,
-          btoa = global.btoa,
-          atob = global.atob,
-          ArrayBuffer = global.ArrayBuffer,
-          Uint8Array = global.Uint8Array,
-          origin = /^[\w-]+:\/*\[?[\w\.:-]+\]?(?::[0-9]+)?/;
+      };
 
+      const FBB_proto = FakeBlobBuilder.prototype;
+      const FB_proto = FakeBlob.prototype;
+      const FileReaderSync = global.FileReaderSync;
+
+      const FileException = function (type) {
+        this.code = this[this.name = type];
+      };
+
+      const file_ex_codes = ('NOT_FOUND_ERR SECURITY_ERR ABORT_ERR NOT_READABLE_ERR ENCODING_ERR ' + 'NO_MODIFICATION_ALLOWED_ERR INVALID_STATE_ERR SYNTAX_ERR').split(' ');
+      let file_ex_code = file_ex_codes.length;
+      const real_URL = global.URL || global.webkitURL || exports;
+      const real_create_object_URL = real_URL.createObjectURL;
+      const real_revoke_object_URL = real_URL.revokeObjectURL;
+      let URL = real_URL;
+      const btoa = global.btoa;
+      const atob = global.atob;
+      const ArrayBuffer = global.ArrayBuffer;
+      const Uint8Array = global.Uint8Array;
+      const origin = /^[\w-]+:\/*\[?[\w\.:-]+\]?(?::[0-9]+)?/;
       FakeBlob.fake = FB_proto.fake = true;
 
       while (file_ex_code--) {
@@ -349,12 +351,12 @@ exports.clearImmediate = typeof clearImmediate === "function" ? clearImmediate :
 
       if (!real_URL.createObjectURL) {
         URL = exports.URL = function (uri) {
-          var uri_info = document.createElementNS("http://www.w3.org/1999/xhtml", "a"),
-              uri_origin;
+          const uri_info = document.createElementNS('http://www.w3.org/1999/xhtml', 'a');
+          let uri_origin;
           uri_info.href = uri;
 
-          if (!("origin" in uri_info)) {
-            if (uri_info.protocol.toLowerCase() === "data:") {
+          if (!('origin' in uri_info)) {
+            if (uri_info.protocol.toLowerCase() === 'data:') {
               uri_info.origin = null;
             } else {
               uri_origin = uri.match(origin);
@@ -367,26 +369,26 @@ exports.clearImmediate = typeof clearImmediate === "function" ? clearImmediate :
       }
 
       URL.createObjectURL = function (blob) {
-        var type = blob.type,
-            data_URI_header;
+        let type = blob.type;
+        let data_URI_header;
 
         if (type === null) {
-          type = "application/octet-stream";
+          type = 'application/octet-stream';
         }
 
         if (blob instanceof FakeBlob) {
-          data_URI_header = "data:" + type;
+          data_URI_header = `data:${type}`;
 
-          if (blob.encoding === "base64") {
-            return data_URI_header + ";base64," + blob.data;
-          } else if (blob.encoding === "URI") {
-            return data_URI_header + "," + decodeURIComponent(blob.data);
+          if (blob.encoding === 'base64') {
+            return `${data_URI_header};base64,${blob.data}`;
+          } else if (blob.encoding === 'URI') {
+            return `${data_URI_header},${decodeURIComponent(blob.data)}`;
           }
 
           if (btoa) {
-            return data_URI_header + ";base64," + btoa(blob.data);
+            return `${data_URI_header};base64,${btoa(blob.data)}`;
           } else {
-            return data_URI_header + "," + encodeURIComponent(blob.data);
+            return `${data_URI_header},${encodeURIComponent(blob.data)}`;
           }
         } else if (real_create_object_URL) {
           return real_create_object_URL.call(real_URL, blob);
@@ -394,7 +396,7 @@ exports.clearImmediate = typeof clearImmediate === "function" ? clearImmediate :
       };
 
       URL.revokeObjectURL = function (object_URL) {
-        if (object_URL.substring(0, 5) !== "data:" && real_revoke_object_URL) {
+        if (object_URL.substring(0, 5) !== 'data:' && real_revoke_object_URL) {
           real_revoke_object_URL.call(real_URL, object_URL);
         }
       };
@@ -402,38 +404,38 @@ exports.clearImmediate = typeof clearImmediate === "function" ? clearImmediate :
       FBB_proto.append = function (data
       /*, endings*/
       ) {
-        var bb = this.data; // decode data to a binary string
+        const bb = this.data; // decode data to a binary string
 
         if (Uint8Array && (data instanceof ArrayBuffer || data instanceof Uint8Array)) {
-          var str = "",
-              buf = new Uint8Array(data),
-              i = 0,
-              buf_len = buf.length;
+          let str = '';
+          const buf = new Uint8Array(data);
+          let i = 0;
+          const buf_len = buf.length;
 
           for (; i < buf_len; i++) {
             str += String.fromCharCode(buf[i]);
           }
 
           bb.push(str);
-        } else if (get_class(data) === "Blob" || get_class(data) === "File") {
+        } else if (get_class(data) === 'Blob' || get_class(data) === 'File') {
           if (FileReaderSync) {
-            var fr = new FileReaderSync();
+            const fr = new FileReaderSync();
             bb.push(fr.readAsBinaryString(data));
           } else {
             // async FileReader won't work as BlobBuilder is sync
-            throw new FileException("NOT_READABLE_ERR");
+            throw new FileException('NOT_READABLE_ERR');
           }
         } else if (data instanceof FakeBlob) {
-          if (data.encoding === "base64" && atob) {
+          if (data.encoding === 'base64' && atob) {
             bb.push(atob(data.data));
-          } else if (data.encoding === "URI") {
+          } else if (data.encoding === 'URI') {
             bb.push(decodeURIComponent(data.data));
-          } else if (data.encoding === "raw") {
+          } else if (data.encoding === 'raw') {
             bb.push(data.data);
           }
         } else {
-          if (typeof data !== "string") {
-            data += ""; // convert unsupported types to strings
+          if (typeof data !== 'string') {
+            data += ''; // convert unsupported types to strings
           } // decode UTF-16 to binary string
 
 
@@ -446,15 +448,15 @@ exports.clearImmediate = typeof clearImmediate === "function" ? clearImmediate :
           type = null;
         }
 
-        return new FakeBlob(this.data.join(""), type, "raw");
+        return new FakeBlob(this.data.join(''), type, 'raw');
       };
 
       FBB_proto.toString = function () {
-        return "[object BlobBuilder]";
+        return '[object BlobBuilder]';
       };
 
       FB_proto.slice = function (start, end, type) {
-        var args = arguments.length;
+        const args = arguments.length;
 
         if (args < 3) {
           type = null;
@@ -464,7 +466,7 @@ exports.clearImmediate = typeof clearImmediate === "function" ? clearImmediate :
       };
 
       FB_proto.toString = function () {
-        return "[object Blob]";
+        return '[object Blob]';
       };
 
       FB_proto.close = function () {
@@ -476,11 +478,11 @@ exports.clearImmediate = typeof clearImmediate === "function" ? clearImmediate :
     }();
 
     exports.Blob = function (blobParts, options) {
-      var type = options ? options.type || "" : "";
-      var builder = new BlobBuilder();
+      const type = options ? options.type || '' : '';
+      const builder = new BlobBuilder();
 
       if (blobParts) {
-        for (var i = 0, len = blobParts.length; i < len; i++) {
+        for (let i = 0, len = blobParts.length; i < len; i++) {
           if (Uint8Array && blobParts[i] instanceof Uint8Array) {
             builder.append(blobParts[i].buffer);
           } else {
@@ -489,7 +491,7 @@ exports.clearImmediate = typeof clearImmediate === "function" ? clearImmediate :
         }
       }
 
-      var blob = builder.getBlob(type);
+      const blob = builder.getBlob(type);
 
       if (!blob.slice && blob.webkitSlice) {
         blob.slice = blob.webkitSlice;
@@ -498,13 +500,13 @@ exports.clearImmediate = typeof clearImmediate === "function" ? clearImmediate :
       return blob;
     };
 
-    var getPrototypeOf = Object.getPrototypeOf || function (object) {
+    const getPrototypeOf = Object.getPrototypeOf || function (object) {
       return object.__proto__;
     };
 
     exports.Blob.prototype = getPrototypeOf(new exports.Blob());
   });
-})(typeof self !== "undefined" && self || typeof window !== "undefined" && window || typeof global !== "undefined" && global || (void 0).content || void 0);
+})(typeof self !== 'undefined' && self || typeof window !== 'undefined' && window || typeof global !== 'undefined' && global || typeof globalThis !== 'undefined' && globalThis || (void 0).content || void 0);
 
 }).call(this)}).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
 },{}],4:[function(require,module,exports){
@@ -537,6 +539,10 @@ exports.clearImmediate = typeof clearImmediate === "function" ? clearImmediate :
 },{}],5:[function(require,module,exports){
 "use strict";
 
+globalThis.__EDITOR__ = globalThis.process && 'electron' in globalThis.process.versions;
+
+const jsbWindow = require('../jsbWindow');
+
 jsb.device = jsb.Device; // cc namespace will be reset to {} in creator, use jsb namespace instead.
 
 const {
@@ -544,17 +550,20 @@ const {
   atob
 } = require('./base64/base64.min');
 
-window.btoa = btoa;
-window.atob = atob;
+jsbWindow.btoa = btoa;
+jsbWindow.atob = atob;
 
 const {
   Blob,
   URL
 } = require('./Blob');
 
-window.Blob = Blob;
-window.URL = URL;
-window.DOMParser = require('./xmldom/dom-parser').DOMParser;
+jsbWindow.Blob = Blob;
+jsbWindow.URL = URL;
+jsbWindow.DOMParser = require('./xmldom/dom-parser').DOMParser;
+jsbWindow.XMLHttpRequest = jsb.XMLHttpRequest;
+jsbWindow.SocketIO = jsb.SocketIO;
+jsbWindow.WebSocket = jsb.WebSocket;
 
 require('./jsb_prepare');
 
@@ -566,16 +575,16 @@ require('./jsb_input');
 
 let _oldRequestFrameCallback = null;
 let _requestAnimationFrameID = 0;
-let _requestAnimationFrameCallbacks = {};
+const _requestAnimationFrameCallbacks = {};
 let _firstTick = true;
 
-window.requestAnimationFrame = function (cb) {
-  let id = ++_requestAnimationFrameID;
+jsbWindow.requestAnimationFrame = function (cb) {
+  const id = ++_requestAnimationFrameID;
   _requestAnimationFrameCallbacks[id] = cb;
   return id;
 };
 
-window.cancelAnimationFrame = function (id) {
+jsbWindow.cancelAnimationFrame = function (id) {
   delete _requestAnimationFrameCallbacks[id];
 };
 
@@ -583,16 +592,16 @@ function tick(nowMilliSeconds) {
   if (_firstTick) {
     _firstTick = false;
 
-    if (window.onload) {
-      var event = new Event('load');
-      event._target = window;
-      window.onload(event);
+    if (jsbWindow.onload) {
+      const event = new Event('load');
+      event._target = globalThis;
+      jsbWindow.onload(event);
     }
   }
 
   fireTimeout(nowMilliSeconds);
 
-  for (let id in _requestAnimationFrameCallbacks) {
+  for (const id in _requestAnimationFrameCallbacks) {
     _oldRequestFrameCallback = _requestAnimationFrameCallbacks[id];
 
     if (_oldRequestFrameCallback) {
@@ -618,12 +627,12 @@ class TimeoutInfo {
 
 }
 
-let _timeoutInfos = {};
+const _timeoutInfos = {};
 
 function fireTimeout(nowMilliSeconds) {
   let info;
 
-  for (let id in _timeoutInfos) {
+  for (const id in _timeoutInfos) {
     info = _timeoutInfos[id];
 
     if (info && info.cb) {
@@ -646,59 +655,59 @@ function fireTimeout(nowMilliSeconds) {
 }
 
 function createTimeoutInfo(prevFuncArgs, isRepeat) {
-  let cb = prevFuncArgs[0];
+  const cb = prevFuncArgs[0];
 
   if (!cb) {
-    console.error("createTimeoutInfo doesn't pass a callback ...");
+    console.error('createTimeoutInfo doesn\'t pass a callback ...');
     return 0;
   }
 
-  let delay = prevFuncArgs.length > 1 ? prevFuncArgs[1] : 0;
+  const delay = prevFuncArgs.length > 1 ? prevFuncArgs[1] : 0;
   let args;
 
   if (prevFuncArgs.length > 2) {
     args = Array.prototype.slice.call(prevFuncArgs, 2);
   }
 
-  let info = new TimeoutInfo(cb, delay, isRepeat, this, args);
+  const info = new TimeoutInfo(cb, delay, isRepeat, this, args);
   _timeoutInfos[info.id] = info;
   return info.id;
 }
 
-window.setTimeout = function (cb) {
+jsbWindow.setTimeout = function (cb) {
   return createTimeoutInfo(arguments, false);
 };
 
-window.clearTimeout = function (id) {
+jsbWindow.clearTimeout = function (id) {
   delete _timeoutInfos[id];
 };
 
-window.setInterval = function (cb) {
+jsbWindow.setInterval = function (cb) {
   return createTimeoutInfo(arguments, true);
 };
 
-window.clearInterval = window.clearTimeout;
-window.alert = console.error.bind(console); // File utils (Temporary, won't be accessible)
+jsbWindow.clearInterval = jsbWindow.clearTimeout;
+jsbWindow.alert = console.error.bind(console); // File utils (Temporary, won't be accessible)
 
 if (typeof jsb.FileUtils !== 'undefined') {
   jsb.fileUtils = jsb.FileUtils.getInstance();
   delete jsb.FileUtils;
 }
 
-XMLHttpRequest.prototype.addEventListener = function (eventName, listener, options) {
-  this['on' + eventName] = listener;
+jsbWindow.XMLHttpRequest.prototype.addEventListener = function (eventName, listener, options) {
+  this[`on${eventName}`] = listener;
 };
 
-XMLHttpRequest.prototype.removeEventListener = function (eventName, listener, options) {
-  this['on' + eventName] = null;
+jsbWindow.XMLHttpRequest.prototype.removeEventListener = function (eventName, listener, options) {
+  this[`on${eventName}`] = null;
 }; // SocketIO
 
 
-if (window.SocketIO) {
-  window.io = window.SocketIO;
-  SocketIO.prototype._Emit = SocketIO.prototype.emit;
+if (jsbWindow.SocketIO) {
+  jsbWindow.io = jsbWindow.SocketIO;
+  jsbWindow.SocketIO.prototype._Emit = jsbWindow.SocketIO.prototype.emit;
 
-  SocketIO.prototype.emit = function (uri, delegate) {
+  jsbWindow.SocketIO.prototype.emit = function (uri, delegate) {
     if (typeof delegate === 'object') {
       delegate = JSON.stringify(delegate);
     }
@@ -707,27 +716,27 @@ if (window.SocketIO) {
   };
 }
 
-window.gameTick = tick; // generate get set function
+jsbWindow.gameTick = tick; // generate get set function
 
 jsb.generateGetSet = function (moduleObj) {
-  for (let classKey in moduleObj) {
-    let classProto = moduleObj[classKey] && moduleObj[classKey].prototype;
+  for (const classKey in moduleObj) {
+    const classProto = moduleObj[classKey] && moduleObj[classKey].prototype;
     if (!classProto) continue;
 
-    for (let getName in classProto) {
-      let getPos = getName.search(/^get/);
+    for (const getName in classProto) {
+      const getPos = getName.search(/^get/);
       if (getPos == -1) continue;
       let propName = getName.replace(/^get/, '');
-      let nameArr = propName.split('');
-      let lowerFirst = nameArr[0].toLowerCase();
-      let upperFirst = nameArr[0].toUpperCase();
+      const nameArr = propName.split('');
+      const lowerFirst = nameArr[0].toLowerCase();
+      const upperFirst = nameArr[0].toUpperCase();
       nameArr.splice(0, 1);
-      let left = nameArr.join('');
+      const left = nameArr.join('');
       propName = lowerFirst + left;
-      let setName = 'set' + upperFirst + left;
+      const setName = `set${upperFirst}${left}`;
       if (classProto.hasOwnProperty(propName)) continue;
-      let setFunc = classProto[setName];
-      let hasSetFunc = typeof setFunc === 'function';
+      const setFunc = classProto[setName];
+      const hasSetFunc = typeof setFunc === 'function';
 
       if (hasSetFunc) {
         Object.defineProperty(classProto, propName, {
@@ -752,12 +761,26 @@ jsb.generateGetSet = function (moduleObj) {
       }
     }
   }
-}; // promise polyfill relies on setTimeout implementation
+};
+
+for (const key in jsbWindow) {
+  if (globalThis[key] === undefined) {
+    globalThis[key] = jsbWindow[key];
+    console.debug(`[web-adapter] override window.${key}`);
+  } else {
+    // globalThis[key] = jsbWindow[key];
+    console.debug(`[web-adapter] skip window.${key}`);
+  }
+}
+
+if (typeof globalThis.window === 'undefined') {
+  globalThis.window = globalThis;
+} // promise polyfill relies on setTimeout implementation
 
 
 require('./promise.min');
 
-},{"./Blob":3,"./base64/base64.min":4,"./jsb-adapter":30,"./jsb_audioengine":35,"./jsb_input":36,"./jsb_prepare":37,"./promise.min":38,"./xmldom/dom-parser":39}],6:[function(require,module,exports){
+},{"../jsbWindow":43,"./Blob":3,"./base64/base64.min":4,"./jsb-adapter":30,"./jsb_audioengine":35,"./jsb_input":36,"./jsb_prepare":37,"./promise.min":38,"./xmldom/dom-parser":39}],6:[function(require,module,exports){
 "use strict";
 
 const ImageData = require('./ImageData');
@@ -1154,6 +1177,8 @@ const Node = require('./Node');
 
 const DOMRect = require('./DOMRect');
 
+const jsbWindow = require('../../jsbWindow');
+
 class Element extends Node {
   constructor() {
     super();
@@ -1174,7 +1199,7 @@ class Element extends Node {
   }
 
   getBoundingClientRect() {
-    return new DOMRect(0, 0, window.innerWidth, window.innerHeight);
+    return new DOMRect(0, 0, jsbWindow.innerWidth, jsbWindow.innerHeight);
   } // attrName is a string that names the attribute to be removed from element.
 
 
@@ -1184,7 +1209,7 @@ class Element extends Node {
 
 module.exports = Element;
 
-},{"./DOMRect":7,"./Node":26}],10:[function(require,module,exports){
+},{"../../jsbWindow":43,"./DOMRect":7,"./Node":26}],10:[function(require,module,exports){
 "use strict";
 
 /**
@@ -1679,6 +1704,10 @@ module.exports = EventTarget;
 
 const EventTarget = require('./EventTarget');
 
+const Event = require('./Event');
+
+const jsbWindow = require('../../jsbWindow');
+
 class FileReader extends EventTarget {
   construct() {
     this.result = null;
@@ -1692,8 +1721,8 @@ class FileReader extends EventTarget {
 
 
   readAsDataURL(blob) {
-    this.result = 'data:image/png;base64,' + window.btoa(blob);
-    var event = new Event('load');
+    this.result = `data:image/png;base64,${jsbWindow.btoa(blob)}`;
+    const event = new Event('load');
     this.dispatchEvent(event);
   } // Starts reading the contents of the specified Blob, once finished, the result attribute contains the contents of the file as a text string.
 
@@ -1704,7 +1733,7 @@ class FileReader extends EventTarget {
 
 module.exports = FileReader;
 
-},{"./EventTarget":11}],13:[function(require,module,exports){
+},{"../../jsbWindow":43,"./Event":10,"./EventTarget":11}],13:[function(require,module,exports){
 "use strict";
 
 class FontFace {
@@ -1807,6 +1836,8 @@ const ImageData = require('./ImageData');
 const DOMRect = require('./DOMRect');
 
 const CanvasRenderingContext2D = require('./CanvasRenderingContext2D');
+
+const jsbWindow = require('../../jsbWindow');
 
 const clamp = function (value) {
   value = Math.round(value);
@@ -1920,11 +1951,11 @@ class HTMLCanvasElement extends HTMLElement {
   }
 
   get clientWidth() {
-    return window.innerWidth;
+    return jsbWindow.innerWidth;
   }
 
   get clientHeight() {
-    return window.innerHeight;
+    return jsbWindow.innerHeight;
   }
 
   get data() {
@@ -1936,7 +1967,7 @@ class HTMLCanvasElement extends HTMLElement {
   }
 
   getBoundingClientRect() {
-    return new DOMRect(0, 0, window.innerWidth, window.innerHeight);
+    return new DOMRect(0, 0, jsbWindow.innerWidth, jsbWindow.innerHeight);
   }
 
   requestPointerLock() {
@@ -1947,7 +1978,7 @@ class HTMLCanvasElement extends HTMLElement {
 
 module.exports = HTMLCanvasElement;
 
-},{"./CanvasRenderingContext2D":6,"./DOMRect":7,"./HTMLElement":16,"./ImageData":22}],16:[function(require,module,exports){
+},{"../../jsbWindow":43,"./CanvasRenderingContext2D":6,"./DOMRect":7,"./HTMLElement":16,"./ImageData":22}],16:[function(require,module,exports){
 "use strict";
 
 const Element = require('./Element');
@@ -1956,6 +1987,8 @@ const {
   noop
 } = require('./util');
 
+const jsbWindow = require('../../jsbWindow');
+
 class HTMLElement extends Element {
   constructor(tagName = '') {
     super();
@@ -1963,11 +1996,11 @@ class HTMLElement extends Element {
     this.className = '';
     this.children = [];
     this.style = {
-      width: `${window.innerWidth}px`,
-      height: `${window.innerHeight}px`
+      width: `${jsbWindow.innerWidth}px`,
+      height: `${jsbWindow.innerHeight}px`
     };
     this.innerHTML = '';
-    this.parentElement = window.__canvas;
+    this.parentElement = jsbWindow.__canvas;
   }
 
   setAttribute(name, value) {
@@ -1984,8 +2017,10 @@ class HTMLElement extends Element {
 
 module.exports = HTMLElement;
 
-},{"./Element":9,"./util":33}],17:[function(require,module,exports){
+},{"../../jsbWindow":43,"./Element":9,"./util":33}],17:[function(require,module,exports){
 "use strict";
+
+function _defineProperty(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
 
 const HTMLElement = require('./HTMLElement');
 
@@ -1998,6 +2033,9 @@ class HTMLImageElement extends HTMLElement {
     }
 
     super('img');
+
+    _defineProperty(this, "_mipmapLevelDataSize", []);
+
     this.width = width ? width : 0;
     this.height = height ? height : 0;
     this._data = null;
@@ -2030,6 +2068,7 @@ class HTMLImageElement extends HTMLElement {
       this.height = this.naturalHeight = info.height;
       this._data = info.data;
       this.complete = true;
+      this._mipmapLevelDataSize = info.mipmapLevelDataSize;
       var event = new Event('load');
       this.dispatchEvent(event);
     });
@@ -2595,11 +2634,13 @@ module.exports = MouseEvent;
 
 const EventTarget = require('./EventTarget');
 
+const jsbWindow = require('../../jsbWindow');
+
 class Node extends EventTarget {
   constructor() {
     super();
     this.childNodes = [];
-    this.parentNode = window.__canvas;
+    this.parentNode = jsbWindow.__canvas;
   }
 
   appendChild(node) {
@@ -2644,7 +2685,7 @@ class Node extends EventTarget {
 
 module.exports = Node;
 
-},{"./EventTarget":11}],27:[function(require,module,exports){
+},{"../../jsbWindow":43,"./EventTarget":11}],27:[function(require,module,exports){
 "use strict";
 
 const Event = require('./Event');
@@ -2678,12 +2719,14 @@ const Node = require('./Node');
 
 const FontFaceSet = require('./FontFaceSet');
 
+const jsbWindow = require('../../jsbWindow');
+
 class Document extends Node {
   constructor() {
     super();
     this.readyState = 'complete';
     this.visibilityState = 'visible';
-    this.documentElement = window;
+    this.documentElement = globalThis;
     this.hidden = false;
     this.style = {};
     this.location = require('./location');
@@ -2712,8 +2755,8 @@ class Document extends Node {
   }
 
   getElementById(id) {
-    if (id === window.__canvas.id || id === 'canvas') {
-      return window.__canvas;
+    if (id === jsbWindow.__canvas.id || id === 'canvas') {
+      return jsbWindow.__canvas;
     }
 
     return new HTMLElement(id);
@@ -2725,7 +2768,7 @@ class Document extends Node {
     } else if (tagName === 'body') {
       return [document.body];
     } else if (tagName === 'canvas') {
-      return [window.__canvas];
+      return [jsbWindow.__canvas];
     }
 
     return [new HTMLElement(tagName)];
@@ -2737,7 +2780,7 @@ class Document extends Node {
     } else if (tagName === 'body') {
       return [document.body];
     } else if (tagName === 'canvas') {
-      return [window.__canvas];
+      return [jsbWindow.__canvas];
     }
 
     return [new HTMLElement(tagName)];
@@ -2749,9 +2792,9 @@ class Document extends Node {
     } else if (query === 'body') {
       return document.body;
     } else if (query === 'canvas') {
-      return window.__canvas;
-    } else if (query === `#${window.__canvas.id}`) {
-      return window.__canvas;
+      return jsbWindow.__canvas;
+    } else if (query === `#${jsbWindow.__canvas.id}`) {
+      return jsbWindow.__canvas;
     }
 
     return new HTMLElement(query);
@@ -2763,7 +2806,7 @@ class Document extends Node {
     } else if (query === 'body') {
       return [document.body];
     } else if (query === 'canvas') {
-      return [window.__canvas];
+      return [jsbWindow.__canvas];
     } else if (query.startsWith('script[type="systemjs-importmap"]')) {
       return HTMLScriptElement._getAllScriptElementsSystemJSImportType();
     }
@@ -2776,12 +2819,12 @@ class Document extends Node {
   }
 
   elementFromPoint() {
-    return window.canvas;
+    return jsbWindow.canvas;
   }
 
   createEvent(type) {
-    if (window[type]) {
-      return new window[type]();
+    if (jsbWindow[type]) {
+      return new jsbWindow[type]();
     }
 
     return null;
@@ -2796,7 +2839,7 @@ class Document extends Node {
 let document = new Document();
 module.exports = document;
 
-},{"./FontFaceSet":14,"./HTMLCanvasElement":15,"./HTMLElement":16,"./HTMLScriptElement":19,"./HTMLVideoElement":20,"./Image":21,"./Node":26,"./location":31}],29:[function(require,module,exports){
+},{"../../jsbWindow":43,"./FontFaceSet":14,"./HTMLCanvasElement":15,"./HTMLElement":16,"./HTMLScriptElement":19,"./HTMLVideoElement":20,"./Image":21,"./Node":26,"./location":31}],29:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -2807,18 +2850,12 @@ exports.Request = Request;
 exports.Response = Response;
 exports.fetch = fetch;
 exports.DOMException = void 0;
-var self = window;
-var support = {
+const self = globalThis;
+const support = {
   searchParams: 'URLSearchParams' in self,
   iterable: 'Symbol' in self && 'iterator' in Symbol,
-  blob: 'FileReader' in self && 'Blob' in self && function () {
-    try {
-      new Blob();
-      return true;
-    } catch (e) {
-      return false;
-    }
-  }(),
+  blob: false,
+  // do not support blob in native
   formData: 'FormData' in self,
   arrayBuffer: 'ArrayBuffer' in self
 };
@@ -2828,7 +2865,7 @@ function isDataView(obj) {
 }
 
 if (support.arrayBuffer) {
-  var viewClasses = ['[object Int8Array]', '[object Uint8Array]', '[object Uint8ClampedArray]', '[object Int16Array]', '[object Uint16Array]', '[object Int32Array]', '[object Uint32Array]', '[object Float32Array]', '[object Float64Array]'];
+  const viewClasses = ['[object Int8Array]', '[object Uint8Array]', '[object Uint8ClampedArray]', '[object Int16Array]', '[object Uint16Array]', '[object Int32Array]', '[object Uint32Array]', '[object Float32Array]', '[object Float64Array]'];
 
   var isArrayBufferView = ArrayBuffer.isView || function (obj) {
     return obj && viewClasses.indexOf(Object.prototype.toString.call(obj)) > -1;
@@ -2857,14 +2894,15 @@ function normalizeValue(value) {
 
 
 function iteratorFor(items) {
-  var iterator = {
-    next: function () {
-      var value = items.shift();
+  const iterator = {
+    next() {
+      const value = items.shift();
       return {
         done: value === undefined,
-        value: value
+        value
       };
     }
+
   };
 
   if (support.iterable) {
@@ -2897,11 +2935,11 @@ function Headers(headers) {
 Headers.prototype.append = function (name, value) {
   name = normalizeName(name);
   value = normalizeValue(value);
-  var oldValue = this.map[name];
-  this.map[name] = oldValue ? oldValue + ', ' + value : value;
+  const oldValue = this.map[name];
+  this.map[name] = oldValue ? `${oldValue}, ${value}` : value;
 };
 
-Headers.prototype['delete'] = function (name) {
+Headers.prototype.delete = function (name) {
   delete this.map[normalizeName(name)];
 };
 
@@ -2919,7 +2957,7 @@ Headers.prototype.set = function (name, value) {
 };
 
 Headers.prototype.forEach = function (callback, thisArg) {
-  for (var name in this.map) {
+  for (const name in this.map) {
     if (this.map.hasOwnProperty(name)) {
       callback.call(thisArg, this.map[name], name, this);
     }
@@ -2927,24 +2965,24 @@ Headers.prototype.forEach = function (callback, thisArg) {
 };
 
 Headers.prototype.keys = function () {
-  var items = [];
-  this.forEach(function (value, name) {
+  const items = [];
+  this.forEach((value, name) => {
     items.push(name);
   });
   return iteratorFor(items);
 };
 
 Headers.prototype.values = function () {
-  var items = [];
-  this.forEach(function (value) {
+  const items = [];
+  this.forEach(value => {
     items.push(value);
   });
   return iteratorFor(items);
 };
 
 Headers.prototype.entries = function () {
-  var items = [];
-  this.forEach(function (value, name) {
+  const items = [];
+  this.forEach((value, name) => {
     items.push([name, value]);
   });
   return iteratorFor(items);
@@ -2963,7 +3001,7 @@ function consumed(body) {
 }
 
 function fileReaderReady(reader) {
-  return new Promise(function (resolve, reject) {
+  return new Promise((resolve, reject) => {
     reader.onload = function () {
       resolve(reader.result);
     };
@@ -2975,24 +3013,24 @@ function fileReaderReady(reader) {
 }
 
 function readBlobAsArrayBuffer(blob) {
-  var reader = new FileReader();
-  var promise = fileReaderReady(reader);
+  const reader = new FileReader();
+  const promise = fileReaderReady(reader);
   reader.readAsArrayBuffer(blob);
   return promise;
 }
 
 function readBlobAsText(blob) {
-  var reader = new FileReader();
-  var promise = fileReaderReady(reader);
+  const reader = new FileReader();
+  const promise = fileReaderReady(reader);
   reader.readAsText(blob);
   return promise;
 }
 
 function readArrayBufferAsText(buf) {
-  var view = new Uint8Array(buf);
-  var chars = new Array(view.length);
+  const view = new Uint8Array(buf);
+  const chars = new Array(view.length);
 
-  for (var i = 0; i < view.length; i++) {
+  for (let i = 0; i < view.length; i++) {
     chars[i] = String.fromCharCode(view[i]);
   }
 
@@ -3003,7 +3041,7 @@ function bufferClone(buf) {
   if (buf.slice) {
     return buf.slice(0);
   } else {
-    var view = new Uint8Array(buf.byteLength);
+    const view = new Uint8Array(buf.byteLength);
     view.set(new Uint8Array(buf));
     return view.buffer;
   }
@@ -3048,7 +3086,7 @@ function Body() {
 
   if (support.blob) {
     this.blob = function () {
-      var rejected = consumed(this);
+      const rejected = consumed(this);
 
       if (rejected) {
         return rejected;
@@ -3075,7 +3113,7 @@ function Body() {
   }
 
   this.text = function () {
-    var rejected = consumed(this);
+    const rejected = consumed(this);
 
     if (rejected) {
       return rejected;
@@ -3106,16 +3144,16 @@ function Body() {
 } // HTTP methods whose capitalization should be normalized
 
 
-var methods = ['DELETE', 'GET', 'HEAD', 'OPTIONS', 'POST', 'PUT'];
+const methods = ['DELETE', 'GET', 'HEAD', 'OPTIONS', 'POST', 'PUT'];
 
 function normalizeMethod(method) {
-  var upcased = method.toUpperCase();
+  const upcased = method.toUpperCase();
   return methods.indexOf(upcased) > -1 ? upcased : method;
 }
 
 function Request(input, options) {
   options = options || {};
-  var body = options.body;
+  let body = options.body;
 
   if (input instanceof Request) {
     if (input.bodyUsed) {
@@ -3166,12 +3204,12 @@ Request.prototype.clone = function () {
 };
 
 function decode(body) {
-  var form = new FormData();
-  body.trim().split('&').forEach(function (bytes) {
+  const form = new FormData();
+  body.trim().split('&').forEach(bytes => {
     if (bytes) {
-      var split = bytes.split('=');
-      var name = split.shift().replace(/\+/g, ' ');
-      var value = split.join('=').replace(/\+/g, ' ');
+      const split = bytes.split('=');
+      const name = split.shift().replace(/\+/g, ' ');
+      const value = split.join('=').replace(/\+/g, ' ');
       form.append(decodeURIComponent(name), decodeURIComponent(value));
     }
   });
@@ -3179,16 +3217,16 @@ function decode(body) {
 }
 
 function parseHeaders(rawHeaders) {
-  var headers = new Headers(); // Replace instances of \r\n and \n followed by at least one space or horizontal tab with a space
+  const headers = new Headers(); // Replace instances of \r\n and \n followed by at least one space or horizontal tab with a space
   // https://tools.ietf.org/html/rfc7230#section-3.2
 
-  var preProcessedHeaders = rawHeaders.replace(/\r?\n[\t ]+/g, ' ');
-  preProcessedHeaders.split(/\r?\n/).forEach(function (line) {
-    var parts = line.split(':');
-    var key = parts.shift().trim();
+  const preProcessedHeaders = rawHeaders.replace(/\r?\n[\t ]+/g, ' ');
+  preProcessedHeaders.split(/\r?\n/).forEach(line => {
+    const parts = line.split(':');
+    const key = parts.shift().trim();
 
     if (key) {
-      var value = parts.join(':').trim();
+      const value = parts.join(':').trim();
       headers.append(key, value);
     }
   });
@@ -3224,7 +3262,7 @@ Response.prototype.clone = function () {
 };
 
 Response.error = function () {
-  var response = new Response(null, {
+  const response = new Response(null, {
     status: 0,
     statusText: ''
   });
@@ -3232,7 +3270,7 @@ Response.error = function () {
   return response;
 };
 
-var redirectStatuses = [301, 302, 303, 307, 308];
+const redirectStatuses = [301, 302, 303, 307, 308];
 
 Response.redirect = function (url, status) {
   if (redirectStatuses.indexOf(status) === -1) {
@@ -3240,7 +3278,7 @@ Response.redirect = function (url, status) {
   }
 
   return new Response(null, {
-    status: status,
+    status,
     headers: {
       location: url
     }
@@ -3256,7 +3294,7 @@ try {
   exports.DOMException = DOMException = function (message, name) {
     this.message = message;
     this.name = name;
-    var error = Error(message);
+    const error = Error(message);
     this.stack = error.stack;
   };
 
@@ -3265,27 +3303,27 @@ try {
 }
 
 function fetch(input, init) {
-  return new Promise(function (resolve, reject) {
-    var request = new Request(input, init);
+  return new Promise((resolve, reject) => {
+    const request = new Request(input, init);
 
     if (request.signal && request.signal.aborted) {
       return reject(new DOMException('Aborted', 'AbortError'));
     }
 
-    var xhr = new XMLHttpRequest();
+    const xhr = new XMLHttpRequest();
 
     function abortXhr() {
       xhr.abort();
     }
 
     xhr.onload = function () {
-      var options = {
+      const options = {
         status: xhr.status,
         statusText: xhr.statusText,
         headers: parseHeaders(xhr.getAllResponseHeaders() || '')
       };
       options.url = 'responseURL' in xhr ? xhr.responseURL : options.headers.get('X-Request-URL');
-      var body = 'response' in xhr ? xhr.response : xhr.responseText;
+      const body = 'response' in xhr ? xhr.response : xhr.responseText;
       resolve(new Response(body, options));
     };
 
@@ -3313,7 +3351,7 @@ function fetch(input, init) {
       xhr.responseType = 'blob';
     }
 
-    request.headers.forEach(function (value, name) {
+    request.headers.forEach((value, name) => {
       xhr.setRequestHeader(name, value);
     });
 
@@ -3388,96 +3426,107 @@ module.exports = noop;
 },{}],34:[function(require,module,exports){
 "use strict";
 
+const jsbWindow = require('../../jsbWindow');
+
 function inject() {
-  window.top = window.parent = window;
-  window.ontouchstart = null;
-  window.ontouchmove = null;
-  window.ontouchend = null;
-  window.ontouchcancel = null;
-  window.pageXOffset = window.pageYOffset = window.clientTop = window.clientLeft = 0;
-  window.outerWidth = window.innerWidth;
-  window.outerHeight = window.innerHeight;
-  window.clientWidth = window.innerWidth;
-  window.clientHeight = window.innerHeight;
-  window.location = require('./location');
-  window.document = require('./document');
-  window.CanvasRenderingContext2D = require('./CanvasRenderingContext2D');
-  window.Element = require('./Element');
-  window.HTMLElement = require('./HTMLElement');
-  window.HTMLCanvasElement = require('./HTMLCanvasElement');
-  window.HTMLImageElement = require('./HTMLImageElement');
-  window.HTMLMediaElement = require('./HTMLMediaElement');
-  window.HTMLVideoElement = require('./HTMLVideoElement');
-  window.HTMLScriptElement = require('./HTMLScriptElement');
-  window.__canvas = new HTMLCanvasElement();
-  window.__canvas._width = window.innerWidth;
-  window.__canvas._height = window.innerHeight;
-  window.navigator = require('./navigator');
-  window.Image = require('./Image');
-  window.FileReader = require('./FileReader');
-  window.FontFace = require('./FontFace');
-  window.FontFaceSet = require('./FontFaceSet');
-  window.EventTarget = require('./EventTarget');
-  window.Event = require('./Event');
-  window.TouchEvent = require('./TouchEvent');
-  window.MouseEvent = require('./MouseEvent');
-  window.KeyboardEvent = require('./KeyboardEvent');
-  window.DeviceMotionEvent = require('./DeviceMotionEvent'); // ES6
+  jsbWindow.ontouchstart = null;
+  jsbWindow.ontouchmove = null;
+  jsbWindow.ontouchend = null;
+  jsbWindow.ontouchcancel = null;
+  jsbWindow.pageXOffset = jsbWindow.pageYOffset = jsbWindow.clientTop = jsbWindow.clientLeft = 0;
+  jsbWindow.outerWidth = jsbWindow.innerWidth;
+  jsbWindow.outerHeight = jsbWindow.innerHeight;
+  jsbWindow.clientWidth = jsbWindow.innerWidth;
+  jsbWindow.clientHeight = jsbWindow.innerHeight; // if (!__EDITOR__) {
 
-  var m_fetch = require('./fetch');
+  jsbWindow.top = jsbWindow.parent = jsbWindow;
+  jsbWindow.location = require('./location');
+  jsbWindow.document = require('./document');
+  jsbWindow.navigator = require('./navigator'); // }
 
-  window.fetch = m_fetch.fetch;
-  window.Headers = m_fetch.Headers;
-  window.Request = m_fetch.Request;
-  window.Response = m_fetch.Response; // const PORTRAIT = 0;
+  jsbWindow.CanvasRenderingContext2D = require('./CanvasRenderingContext2D');
+  jsbWindow.Element = require('./Element');
+  jsbWindow.HTMLElement = require('./HTMLElement');
+  jsbWindow.HTMLCanvasElement = require('./HTMLCanvasElement');
+  jsbWindow.HTMLImageElement = require('./HTMLImageElement');
+  jsbWindow.HTMLMediaElement = require('./HTMLMediaElement');
+  jsbWindow.HTMLVideoElement = require('./HTMLVideoElement');
+  jsbWindow.HTMLScriptElement = require('./HTMLScriptElement');
+  jsbWindow.__canvas = new jsbWindow.HTMLCanvasElement();
+  jsbWindow.__canvas._width = jsbWindow.innerWidth;
+  jsbWindow.__canvas._height = jsbWindow.innerHeight;
+  jsbWindow.Image = require('./Image');
+  jsbWindow.FileReader = require('./FileReader');
+  jsbWindow.FontFace = require('./FontFace');
+  jsbWindow.FontFaceSet = require('./FontFaceSet');
+  jsbWindow.EventTarget = require('./EventTarget');
+  jsbWindow.Event = jsbWindow.Event || require('./Event');
+  jsbWindow.TouchEvent = require('./TouchEvent');
+  jsbWindow.MouseEvent = require('./MouseEvent');
+  jsbWindow.KeyboardEvent = require('./KeyboardEvent');
+  jsbWindow.DeviceMotionEvent = require('./DeviceMotionEvent'); // ES6
+
+  const m_fetch = require('./fetch');
+
+  jsbWindow.fetch = m_fetch.fetch;
+  jsbWindow.Headers = m_fetch.Headers;
+  jsbWindow.Request = m_fetch.Request;
+  jsbWindow.Response = m_fetch.Response; // const PORTRAIT = 0;
   // const LANDSCAPE_LEFT = -90;
   // const PORTRAIT_UPSIDE_DOWN = 180;
   // const LANDSCAPE_RIGHT = 90;
 
-  window.orientation = jsb.device.getDeviceOrientation(); // window.devicePixelRatio is readonly
+  jsbWindow.orientation = jsb.device.getDeviceOrientation(); // jsb.window.devicePixelRatio is readonly
 
-  Object.defineProperty(window, "devicePixelRatio", {
-    get: function () {
-      return jsb.device.getDevicePixelRatio ? jsb.device.getDevicePixelRatio() : 1;
-    },
-    set: function (_dpr) {
-      /* ignore */
-    },
-    enumerable: true,
-    configurable: true
-  });
-  window.screen = {
+  if (!__EDITOR__) {
+    Object.defineProperty(jsbWindow, 'devicePixelRatio', {
+      get() {
+        return jsb.device.getDevicePixelRatio ? jsb.device.getDevicePixelRatio() : 1;
+      },
+
+      set(_dpr) {
+        /* ignore */
+      },
+
+      enumerable: true,
+      configurable: true
+    });
+  }
+
+  jsbWindow.screen = {
     availTop: 0,
     availLeft: 0,
-    availHeight: window.innerWidth,
-    availWidth: window.innerHeight,
+    availHeight: jsbWindow.innerWidth,
+    availWidth: jsbWindow.innerHeight,
     colorDepth: 8,
     pixelDepth: 8,
     left: 0,
     top: 0,
-    width: window.innerWidth,
-    height: window.innerHeight,
+    width: jsbWindow.innerWidth,
+    height: jsbWindow.innerHeight,
     orientation: {
       //FIXME:cjh
       type: 'portrait-primary' // portrait-primary, portrait-secondary, landscape-primary, landscape-secondary
 
     },
-    onorientationchange: function (event) {}
+
+    onorientationchange(event) {}
+
   };
 
-  window.addEventListener = function (eventName, listener, options) {
-    window.__canvas.addEventListener(eventName, listener, options);
+  jsbWindow.addEventListener = function (eventName, listener, options) {
+    jsbWindow.__canvas.addEventListener(eventName, listener, options);
   };
 
-  window.removeEventListener = function (eventName, listener, options) {
-    window.__canvas.removeEventListener(eventName, listener, options);
+  jsbWindow.removeEventListener = function (eventName, listener, options) {
+    jsbWindow.__canvas.removeEventListener(eventName, listener, options);
   };
 
-  window.dispatchEvent = function (event) {
-    window.__canvas.dispatchEvent(event);
+  jsbWindow.dispatchEvent = function (event) {
+    jsbWindow.__canvas.dispatchEvent(event);
   };
 
-  window.getComputedStyle = function (element) {
+  jsbWindow.getComputedStyle = function (element) {
     return {
       position: 'absolute',
       left: '0px',
@@ -3486,39 +3535,41 @@ function inject() {
     };
   };
 
-  window.resize = function (width, height) {
-    window.innerWidth = width;
-    window.innerHeight = height;
-    window.outerWidth = window.innerWidth;
-    window.outerHeight = window.innerHeight;
-    window.__canvas._width = window.innerWidth;
-    window.__canvas._height = window.innerHeight;
-    window.screen.availWidth = window.innerWidth;
-    window.screen.availHeight = window.innerHeight;
-    window.screen.width = window.innerWidth;
-    window.screen.height = window.innerHeight;
-    window.clientWidth = window.innerWidth;
-    window.clientHeight = window.innerHeight; // emit resize consistent with web behavior
+  jsbWindow.resize = function (width, height) {
+    jsbWindow.innerWidth = width;
+    jsbWindow.innerHeight = height;
+    jsbWindow.outerWidth = jsbWindow.innerWidth;
+    jsbWindow.outerHeight = jsbWindow.innerHeight;
+    jsbWindow.__canvas._width = jsbWindow.innerWidth;
+    jsbWindow.__canvas._height = jsbWindow.innerHeight;
+    jsbWindow.screen.availWidth = jsbWindow.innerWidth;
+    jsbWindow.screen.availHeight = jsbWindow.innerHeight;
+    jsbWindow.screen.width = jsbWindow.innerWidth;
+    jsbWindow.screen.height = jsbWindow.innerHeight;
+    jsbWindow.clientWidth = jsbWindow.innerWidth;
+    jsbWindow.clientHeight = jsbWindow.innerHeight; // emit resize consistent with web behavior
 
-    let resizeEvent = new Event('resize');
-    resizeEvent._target = window;
-    window.dispatchEvent(resizeEvent);
+    const resizeEvent = new jsbWindow.Event('resize');
+    resizeEvent._target = jsbWindow;
+    jsbWindow.dispatchEvent(resizeEvent);
   };
 
-  window.focus = function () {};
+  jsbWindow.focus = function () {};
 
-  window.scroll = function () {};
+  jsbWindow.scroll = function () {};
 
-  window._isInjected = true;
+  jsbWindow._isInjected = true;
 }
 
-if (!window._isInjected) {
+if (!jsbWindow._isInjected) {
   inject();
 }
 
-window.localStorage = sys.localStorage;
+if (!__EDITOR__) {
+  jsbWindow.localStorage = sys.localStorage;
+}
 
-},{"./CanvasRenderingContext2D":6,"./DeviceMotionEvent":8,"./Element":9,"./Event":10,"./EventTarget":11,"./FileReader":12,"./FontFace":13,"./FontFaceSet":14,"./HTMLCanvasElement":15,"./HTMLElement":16,"./HTMLImageElement":17,"./HTMLMediaElement":18,"./HTMLScriptElement":19,"./HTMLVideoElement":20,"./Image":21,"./KeyboardEvent":23,"./MouseEvent":25,"./TouchEvent":27,"./document":28,"./fetch":29,"./location":31,"./navigator":32}],35:[function(require,module,exports){
+},{"../../jsbWindow":43,"./CanvasRenderingContext2D":6,"./DeviceMotionEvent":8,"./Element":9,"./Event":10,"./EventTarget":11,"./FileReader":12,"./FontFace":13,"./FontFaceSet":14,"./HTMLCanvasElement":15,"./HTMLElement":16,"./HTMLImageElement":17,"./HTMLMediaElement":18,"./HTMLScriptElement":19,"./HTMLVideoElement":20,"./Image":21,"./KeyboardEvent":23,"./MouseEvent":25,"./TouchEvent":27,"./document":28,"./fetch":29,"./location":31,"./navigator":32}],35:[function(require,module,exports){
 "use strict";
 
 (function (jsb) {
@@ -3545,15 +3596,17 @@ const EventTarget = require('./jsb-adapter/EventTarget');
 
 const Event = require('./jsb-adapter/Event');
 
-var eventTarget = new EventTarget();
-var callbackWrappers = {};
-var callbacks = {};
-var index = 1;
+const eventTarget = new EventTarget();
+const callbackWrappers = {};
+const callbacks = {};
+let index = 1;
 
-var callbackWrapper = function (cb) {
-  if (!cb) return null;
+const callbackWrapper = function (cb) {
+  if (!cb) {
+    return null;
+  }
 
-  var func = function (event) {
+  const func = function (event) {
     cb({
       value: event.text
     });
@@ -3564,55 +3617,75 @@ var callbackWrapper = function (cb) {
   return func;
 };
 
-var getCallbackWrapper = function (cb) {
+const getCallbackWrapper = function (cb) {
   if (cb && cb.___index) {
-    var ret = callbackWrappers[cb.___index];
+    const ret = callbackWrappers[cb.___index];
     delete callbackWrappers[cb.___index];
     return ret;
-  } else return null;
+  } else {
+    return null;
+  }
 };
 
-var removeListener = function (name, cb) {
-  if (cb) eventTarget.removeEventListener(name, getCallbackWrapper(cb));else {
+const removeListener = function (name, cb) {
+  if (cb) {
+    eventTarget.removeEventListener(name, getCallbackWrapper(cb));
+  } else {
     // remove all listeners of name
-    var cbs = callbacks[name];
-    if (!cbs) return;
+    const cbs = callbacks[name];
 
-    for (var i = 0, len = cbs.length; i < len; ++i) eventTarget.removeEventListener(name, cbs[i]);
+    if (!cbs) {
+      return;
+    }
+
+    for (let i = 0, len = cbs.length; i < len; ++i) {
+      eventTarget.removeEventListener(name, cbs[i]);
+    }
 
     delete callbacks[name];
   }
 };
 
-var recordCallback = function (name, cb) {
-  if (!cb || !name || name === '') return;
-  if (!callbacks[name]) callbacks[name] = [];
+const recordCallback = function (name, cb) {
+  if (!cb || !name || name === '') {
+    return;
+  }
+
+  if (!callbacks[name]) {
+    callbacks[name] = [];
+  }
+
   callbacks[name].push(cb);
 };
 
 jsb.inputBox = {
-  onConfirm: function (cb) {
-    var newCb = callbackWrapper(cb);
+  onConfirm(cb) {
+    const newCb = callbackWrapper(cb);
     eventTarget.addEventListener('confirm', newCb);
     recordCallback('confirm', newCb);
   },
-  offConfirm: function (cb) {
+
+  offConfirm(cb) {
     removeListener('confirm', cb);
   },
-  onComplete: function (cb) {
-    var newCb = callbackWrapper(cb);
+
+  onComplete(cb) {
+    const newCb = callbackWrapper(cb);
     eventTarget.addEventListener('complete', newCb);
     recordCallback('complete', newCb);
   },
-  offComplete: function (cb) {
+
+  offComplete(cb) {
     removeListener('complete', cb);
   },
-  onInput: function (cb) {
-    var newCb = callbackWrapper(cb);
+
+  onInput(cb) {
+    const newCb = callbackWrapper(cb);
     eventTarget.addEventListener('input', newCb);
     recordCallback('input', newCb);
   },
-  offInput: function (cb) {
+
+  offInput(cb) {
     removeListener('input', cb);
   },
 
@@ -3623,20 +3696,22 @@ jsb.inputBox = {
    * @param {bool}        options.confirmHold
    * @param {string}      options.confirmType
    * @param {string}      options.inputType
-   * 
+   *
    * Values of options.confirmType can be [done|next|search|go|send].
    * Values of options.inputType can be [text|email|number|phone|password].
    */
-  show: function (options) {
+  show(options) {
     jsb.showInputBox(options);
   },
-  hide: function () {
+
+  hide() {
     jsb.hideInputBox();
   }
+
 };
 
 jsb.onTextInput = function (eventName, text) {
-  var event = new Event(eventName);
+  const event = new Event(eventName);
   event.text = text;
   eventTarget.dispatchEvent(event);
 };
@@ -3711,39 +3786,29 @@ jsb.unregisterChildRefsForNode = function (node, recursive) {
 
 /*! @source https://cdn.jsdelivr.net/npm/promise-polyfill@8/dist/polyfill.js */
 !function (e, n) {
-  "object" == typeof exports && "undefined" != typeof module ? n() : "function" == typeof define && define.amd ? define(n) : n();
-}(0, function () {
-  "use strict";
-
+  typeof exports === 'object' && typeof module !== 'undefined' ? n() : typeof define === 'function' && define.amd ? define(n) : n();
+}(0, () => {
   function e(e) {
-    var n = this.constructor;
-    return this.then(function (t) {
-      return n.resolve(e()).then(function () {
-        return t;
-      });
-    }, function (t) {
-      return n.resolve(e()).then(function () {
-        return n.reject(t);
-      });
-    });
+    const n = this.constructor;
+    return this.then(t => n.resolve(e()).then(() => t), t => n.resolve(e()).then(() => n.reject(t)));
   }
 
   function n() {}
 
   function t(e) {
-    if (!(this instanceof t)) throw new TypeError("Promises must be constructed via new");
-    if ("function" != typeof e) throw new TypeError("not a function");
+    if (!(this instanceof t)) throw new TypeError('Promises must be constructed via new');
+    if (typeof e !== 'function') throw new TypeError('not a function');
     this._state = 0, this._handled = !1, this._value = undefined, this._deferreds = [], u(e, this);
   }
 
   function o(e, n) {
-    for (; 3 === e._state;) e = e._value;
+    for (; e._state === 3;) e = e._value;
 
-    0 !== e._state ? (e._handled = !0, t._immediateFn(function () {
-      var t = 1 === e._state ? n.onFulfilled : n.onRejected;
+    e._state !== 0 ? (e._handled = !0, t._immediateFn(() => {
+      const t = e._state === 1 ? n.onFulfilled : n.onRejected;
 
-      if (null !== t) {
-        var o;
+      if (t !== null) {
+        let o;
 
         try {
           o = t(e._value);
@@ -3752,18 +3817,18 @@ jsb.unregisterChildRefsForNode = function (node, recursive) {
         }
 
         r(n.promise, o);
-      } else (1 === e._state ? r : i)(n.promise, e._value);
+      } else (e._state === 1 ? r : i)(n.promise, e._value);
     })) : e._deferreds.push(n);
   }
 
   function r(e, n) {
     try {
-      if (n === e) throw new TypeError("A promise cannot be resolved with itself.");
+      if (n === e) throw new TypeError('A promise cannot be resolved with itself.');
 
-      if (n && ("object" == typeof n || "function" == typeof n)) {
-        var o = n.then;
+      if (n && (typeof n === 'object' || typeof n === 'function')) {
+        const o = n.then;
         if (n instanceof t) return e._state = 3, e._value = n, void f(e);
-        if ("function" == typeof o) return void u(function (e, n) {
+        if (typeof o === 'function') return void u(function (e, n) {
           return function () {
             e.apply(n, arguments);
           };
@@ -3781,22 +3846,22 @@ jsb.unregisterChildRefsForNode = function (node, recursive) {
   }
 
   function f(e) {
-    2 === e._state && 0 === e._deferreds.length && t._immediateFn(function () {
+    e._state === 2 && e._deferreds.length === 0 && t._immediateFn(() => {
       e._handled || t._unhandledRejectionFn(e._value);
     });
 
-    for (var n = 0, r = e._deferreds.length; r > n; n++) o(e, e._deferreds[n]);
+    for (let n = 0, r = e._deferreds.length; r > n; n++) o(e, e._deferreds[n]);
 
     e._deferreds = null;
   }
 
   function u(e, n) {
-    var t = !1;
+    let t = !1;
 
     try {
-      e(function (e) {
+      e(e => {
         t || (t = !0, r(n, e));
-      }, function (e) {
+      }, e => {
         t || (t = !0, i(n, e));
       });
     } catch (o) {
@@ -3805,65 +3870,65 @@ jsb.unregisterChildRefsForNode = function (node, recursive) {
     }
   }
 
-  var c = setTimeout;
-  t.prototype["catch"] = function (e) {
+  const c = setTimeout;
+  t.prototype.catch = function (e) {
     return this.then(null, e);
   }, t.prototype.then = function (e, t) {
-    var r = new this.constructor(n);
+    const r = new this.constructor(n);
     return o(this, new function (e, n, t) {
-      this.onFulfilled = "function" == typeof e ? e : null, this.onRejected = "function" == typeof n ? n : null, this.promise = t;
+      this.onFulfilled = typeof e === 'function' ? e : null, this.onRejected = typeof n === 'function' ? n : null, this.promise = t;
     }(e, t, r)), r;
-  }, t.prototype["finally"] = e, t.all = function (e) {
-    return new t(function (n, t) {
+  }, t.prototype.finally = e, t.all = function (e) {
+    return new t((n, t) => {
       function o(e, f) {
         try {
-          if (f && ("object" == typeof f || "function" == typeof f)) {
-            var u = f.then;
-            if ("function" == typeof u) return void u.call(f, function (n) {
+          if (f && (typeof f === 'object' || typeof f === 'function')) {
+            const u = f.then;
+            if (typeof u === 'function') return void u.call(f, n => {
               o(e, n);
             }, t);
           }
 
-          r[e] = f, 0 == --i && n(r);
+          r[e] = f, --i == 0 && n(r);
         } catch (c) {
           t(c);
         }
       }
 
-      if (!e || "undefined" == typeof e.length) throw new TypeError("Promise.all accepts an array");
+      if (!e || typeof e.length === 'undefined') throw new TypeError('Promise.all accepts an array');
       var r = Array.prototype.slice.call(e);
-      if (0 === r.length) return n([]);
+      if (r.length === 0) return n([]);
 
       for (var i = r.length, f = 0; r.length > f; f++) o(f, r[f]);
     });
   }, t.resolve = function (e) {
-    return e && "object" == typeof e && e.constructor === t ? e : new t(function (n) {
+    return e && typeof e === 'object' && e.constructor === t ? e : new t(n => {
       n(e);
     });
   }, t.reject = function (e) {
-    return new t(function (n, t) {
+    return new t((n, t) => {
       t(e);
     });
   }, t.race = function (e) {
-    return new t(function (n, t) {
-      for (var o = 0, r = e.length; r > o; o++) e[o].then(n, t);
+    return new t((n, t) => {
+      for (let o = 0, r = e.length; r > o; o++) e[o].then(n, t);
     });
-  }, t._immediateFn = "function" == typeof setImmediate && function (e) {
+  }, t._immediateFn = typeof setImmediate === 'function' && function (e) {
     setImmediate(e);
   } || function (e) {
     c(e, 0);
   }, t._unhandledRejectionFn = function (e) {
-    void 0 !== console && console && console.warn("Possible Unhandled Promise Rejection:", e);
+    void 0 !== console && console && console.warn('Possible Unhandled Promise Rejection:', e);
   };
 
-  var l = function () {
-    if ("undefined" != typeof self) return self;
-    if ("undefined" != typeof window) return window;
-    if ("undefined" != typeof global) return global;
-    throw Error("unable to locate global object");
+  const l = function () {
+    if (typeof self !== 'undefined') return self;
+    if (typeof window !== 'undefined') return window;
+    if (typeof global !== 'undefined') return global;
+    throw Error('unable to locate global object');
   }();
 
-  "Promise" in l ? l.Promise.prototype["finally"] || (l.Promise.prototype["finally"] = e) : l.Promise = t;
+  'Promise' in l ? l.Promise.prototype.finally || (l.Promise.prototype.finally = e) : l.Promise = t;
 });
 
 }).call(this)}).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {},require("timers").setImmediate)
@@ -6608,5 +6673,12 @@ function split(source, start) {
 }
 
 exports.XMLReader = XMLReader;
+
+},{}],43:[function(require,module,exports){
+"use strict";
+
+const jsbWindow = globalThis.jsb.window = globalThis.jsb.window || {}; //TODO(PatriceJiang):
+
+module.exports = jsbWindow;
 
 },{}]},{},[5]);
