@@ -34,6 +34,8 @@ endif()
 
 include(${RES_DIR}/proj/cfg.cmake)
 
+set(NODE_EXECUTABLE "/usr/local/bin/node")
+
 if(NOT COCOS_X_PATH)
     message(FATAL_ERROR "COCOS_X_PATH is not set!")
 endif()
