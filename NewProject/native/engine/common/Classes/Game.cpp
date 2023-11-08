@@ -35,6 +35,9 @@
 Game::Game() = default;
 
 int Game::init() {
+
+    CC_LOG_INFO("ProjectGame::init");
+
     _windowInfo.title = GAME_NAME;
     // configurate window size
     // _windowInfo.height = 600;
@@ -56,14 +59,17 @@ int Game::init() {
 }
 
 void Game::onPause() {
+    CC_LOG_INFO("ProjectGame::onPause");
     BaseGame::onPause();
 }
 
 void Game::onResume() {
+    CC_LOG_INFO("ProjectGame::onResume");
     BaseGame::onResume();
 }
 
 void Game::onClose() {
+    CC_LOG_INFO("ProjectGame::onClose");
     BaseGame::onClose();
 }
 
