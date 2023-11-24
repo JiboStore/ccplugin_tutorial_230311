@@ -49,5 +49,17 @@ export class HelloWorld extends Component {
             this.bgmSource.pause();
         }
     }
+
+    editBoxDidBegin(editBox, customEventData) {
+        console.info("HelloWorld.editBoxDidBegin", editBox, customEventData);
+    }
+
+    editBoxDidEnded(editBox, customEventData) {
+        console.info("HelloWorld.editBoxDidEnded", editBox, customEventData);
+    }
+
+    editBoxDidChanged(editBox, customEventData) {
+        console.info("HelloWorld.editBoxDidChanged", editBox, customEventData);
+    }
 }
 
